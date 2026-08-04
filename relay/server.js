@@ -10,6 +10,7 @@ const config = require('./config');
 const models = require('./models');
 const pricing = require('./pricing');
 const { Ledger } = require('./ledger');
+const metering = require('./metering');
 
 config.require(); // exits with an actionable message if the key is missing
 
@@ -20,6 +21,14 @@ const ledger = new Ledger();
 // hosted relay it would be an endpoint that mints free inference for anyone who
 // finds it, so it stays off unless explicitly switched on.
 const ALLOW_DEBUG_CREDIT = process.env.ALLOW_DEBUG_CREDIT === '1';
+
+// A safety classifier can decline a request outright. Rerouting server-side
+// recovers the message instead of leaving the student staring at a refusal.
+// Set DISABLE_FALLBACK=1 if this beta ever stops being accepted.
+const SERVER_SIDE_FALLBACK =
+  process.env.DISABLE_FALLBACK === '1'
+    ? null
+    : { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' };
 
 // Small on purpose — this endpoint exists to prove the key works, not to do real
 // work. Note max_tokens caps thinking *and* response text together, and thinking
@@ -215,8 +224,78 @@ async function handleStreamMessage(req, res) {
   if (valid.error) return fail(res, 400, valid.error[0], valid.error[1]);
   const { prompt, model, effort } = valid;
 
-  // Everything below this line is streamed, so the status code is already
-  // committed — failures arrive as an `error` event, not an HTTP status.
+  const studentId = body.studentId;
+  if (typeof studentId !== 'string' || !studentId.trim()) {
+    return fail(res, 400, 'missing_student', 'Send a "studentId" — the relay has to know whose balance to charge.');
+  }
+
+  // ── HOLD ──────────────────────────────────────────────────────────────────
+  // All of this happens before a single byte is streamed, so an unaffordable
+  // message gets a clean HTTP status the frontend can branch on, rather than an
+  // error buried inside a stream it has already started rendering.
+  let estimatedInputTokens;
+  try {
+    const counted = await anthropic.messages.countTokens({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    estimatedInputTokens = counted.input_tokens;
+  } catch (err) {
+    const [status, code, message] = describeApiError(err);
+    return fail(res, status, code, message);
+  }
+
+  const balanceTokens = ledger.getBalance(studentId);
+  const plan = metering.planSpend({
+    modelId: model,
+    balanceTokens,
+    estimatedInputTokens,
+    hardCapTokens: STREAM_MAX_TOKENS,
+  });
+
+  if (!plan.ok) {
+    // 402 Payment Required. Not an error in the code — an ordinary thing that
+    // happens to students, and the frontend's cue to fall back to the local
+    // model with a clear label.
+    return json(res, 402, {
+      error: {
+        code: 'INSUFFICIENT_BALANCE',
+        message: `Not enough tokens for this message on ${model}. Balance is ${balanceTokens}; this needs about ${plan.neededTokens}.`,
+      },
+      studentId,
+      balanceTokens,
+      neededTokens: plan.neededTokens,
+      estimatedInputTokens,
+      model,
+      effort: effort || models.DEFAULT_EFFORT,
+    });
+  }
+
+  const held = ledger.debit(studentId, plan.holdTokens, {
+    model,
+    effort: effort || models.DEFAULT_EFFORT,
+    inputTokens: estimatedInputTokens,
+    note: 'hold',
+  });
+  if (!held.ok) {
+    // Lost a race with a concurrent message. The guarantee held; this one just
+    // arrived second.
+    return json(res, 402, {
+      error: {
+        code: 'INSUFFICIENT_BALANCE',
+        message: `Balance changed while this message was being prepared. Balance is now ${held.balance}.`,
+      },
+      studentId,
+      balanceTokens: held.balance,
+      neededTokens: plan.holdTokens,
+    });
+  }
+
+  // ── STREAM ────────────────────────────────────────────────────────────────
+  // Past this point the status code is committed, so failures arrive as an
+  // `error` event rather than an HTTP status. The hold is now outstanding and
+  // MUST be settled on every exit path below, or a student loses tokens to a
+  // message they never received.
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
@@ -228,38 +307,71 @@ async function handleStreamMessage(req, res) {
     if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
-  send('start', { model, effort: effort || models.DEFAULT_EFFORT });
+  send('start', {
+    model,
+    effort: effort || models.DEFAULT_EFFORT,
+    estimatedInputTokens,
+    heldTokens: plan.holdTokens,
+    balanceAfterHold: held.balance,
+    maxOutputTokens: plan.maxTokens,
+  });
 
   let stream;
-  // If the student closes the tab, stop generating. Tokens already produced are
-  // still billed, but there's no reason to keep paying for output nobody reads.
+  let settled = false;
+  let outputChars = 0;
+
+  const settle = (actualMicroUSD, note) => {
+    if (settled) return null;
+    settled = true;
+    return ledger.settle(studentId, plan.holdTokens, actualMicroUSD, {
+      model,
+      effort: effort || models.DEFAULT_EFFORT,
+      inputTokens: estimatedInputTokens,
+      note,
+    });
+  };
+
+  // If the student closes the tab, stop generating — but still settle, because
+  // whatever was produced before the abort was genuinely billed.
   req.on('close', () => {
-    if (stream && !res.writableEnded) {
+    if (stream && !settled) {
       try { stream.abort(); } catch (e) { /* already finished */ }
     }
   });
 
   try {
-    stream = anthropic.messages.stream(
-      buildRequest({ prompt, model, effort, maxTokens: STREAM_MAX_TOKENS })
-    );
+    const request = buildRequest({ prompt, model, effort, maxTokens: plan.maxTokens });
+    // Server-side fallback: a safety classifier can decline a request, and
+    // rerouting it server-side recovers the message instead of dead-ending the
+    // student. "default" lets Anthropic pick the substitute by refusal
+    // category, so there's no model list here to go stale.
+    stream = SERVER_SIDE_FALLBACK
+      ? anthropic.beta.messages.stream({ ...request, ...SERVER_SIDE_FALLBACK })
+      : anthropic.messages.stream(request);
 
     for await (const event of stream) {
       if (event.type !== 'content_block_delta') continue;
       const delta = event.delta;
       if (delta.type === 'text_delta') {
+        outputChars += delta.text.length;
         send('text', { text: delta.text });
       } else if (delta.type === 'thinking_delta') {
         // Summarized reasoning — gives the UI something to show during the
         // long pause before the answer starts.
+        outputChars += delta.thinking.length;
         send('thinking', { text: delta.thinking });
       }
     }
 
     const message = await stream.finalMessage();
 
-    // Check stop_reason before trusting content. A safety refusal arrives as a
-    // successful response with empty content.
+    // ── SETTLE ──────────────────────────────────────────────────────────────
+    // A safety refusal arrives as a *successful* response with empty content and
+    // near-zero usage, so this path handles it correctly without a special case:
+    // the real cost is tiny, and nearly the whole hold is refunded.
+    const cost = pricing.costOf(model, message.usage);
+    const outcome = settle(cost.totalMicroUSD, message.stop_reason === 'refusal' ? 'refused by safety classifier' : null);
+
     send('done', {
       model: message.model,
       effort: effort || models.DEFAULT_EFFORT,
@@ -268,14 +380,37 @@ async function handleStreamMessage(req, res) {
       stop_details: message.stop_details || null,
       truncated: message.stop_reason === 'max_tokens',
       usage: message.usage,
-      // What this message actually cost. Step 7 settles the ledger against
-      // exactly this number.
-      cost: pricing.costOf(model, message.usage),
+      cost,
+      // What the student actually paid, and what they have left.
+      charged: outcome.charged,
+      refunded: outcome.refunded,
+      held: outcome.held,
+      balance: outcome.balance,
     });
   } catch (err) {
+    // The stream died partway. Tokens were generated and billed, so the honest
+    // thing is to charge for them — but usage never arrived, so estimate from
+    // what was streamed and label the log entry as an estimate.
+    const spec = models.get(model);
+    const estimatedOutputTokens = Math.ceil(outputChars / 4); // ~4 chars/token
+    const estimatedMicroUSD =
+      metering.microUSDFor(estimatedInputTokens, spec.pricePerMTok.input) +
+      metering.microUSDFor(estimatedOutputTokens, spec.pricePerMTok.output);
+    const outcome = settle(estimatedMicroUSD, 'stream failed — cost estimated from streamed output');
+
     const [, code, message] = describeApiError(err);
-    send('error', { code, message });
+    send('error', {
+      code,
+      message,
+      charged: outcome ? outcome.charged : 0,
+      refunded: outcome ? outcome.refunded : 0,
+      balance: outcome ? outcome.balance : ledger.getBalance(studentId),
+      estimated: true,
+    });
   } finally {
+    // Belt and braces: if any path above escaped without settling, refund the
+    // entire hold rather than silently keeping a student's tokens.
+    if (!settled) settle(0, 'unsettled hold refunded');
     if (!res.writableEnded) res.end();
   }
 }

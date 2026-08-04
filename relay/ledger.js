@@ -40,6 +40,36 @@ function appTokensForMicroUSD(microUSD) {
 
 const DEFAULT_DB_PATH = process.env.LEDGER_DB || path.join(__dirname, 'ledger.sqlite');
 
+// A spend_log row created before step 7 only permits 'debit' and 'credit'.
+// Rebuild it so settlements can be recorded. SQLite can't ALTER a CHECK
+// constraint, so the table is recreated and the rows copied across.
+function migrateSpendLogKinds(db) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='spend_log'").get();
+  if (!row || row.sql.includes("'settle'")) return;
+  db.exec(`
+    BEGIN IMMEDIATE;
+    ALTER TABLE spend_log RENAME TO spend_log_old;
+    CREATE TABLE spend_log (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts              TEXT    NOT NULL,
+      student_id      TEXT    NOT NULL,
+      kind            TEXT    NOT NULL CHECK (kind IN ('debit','credit','settle')),
+      app_tokens      INTEGER NOT NULL,
+      balance_after   INTEGER NOT NULL,
+      model           TEXT,
+      effort          TEXT,
+      input_tokens    INTEGER,
+      output_tokens   INTEGER,
+      thinking_tokens INTEGER,
+      cost_micro_usd  INTEGER,
+      note            TEXT
+    );
+    INSERT INTO spend_log SELECT * FROM spend_log_old;
+    DROP TABLE spend_log_old;
+    COMMIT;
+  `);
+}
+
 function open(dbPath = DEFAULT_DB_PATH) {
   const db = new DatabaseSync(dbPath);
   // WAL lets readers work while a writer holds the lock; busy_timeout makes a
@@ -57,7 +87,7 @@ function open(dbPath = DEFAULT_DB_PATH) {
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       ts              TEXT    NOT NULL,
       student_id      TEXT    NOT NULL,
-      kind            TEXT    NOT NULL CHECK (kind IN ('debit','credit')),
+      kind            TEXT    NOT NULL CHECK (kind IN ('debit','credit','settle')),
       app_tokens      INTEGER NOT NULL,
       balance_after   INTEGER NOT NULL,
       model           TEXT,
@@ -70,6 +100,7 @@ function open(dbPath = DEFAULT_DB_PATH) {
     );
     CREATE INDEX IF NOT EXISTS idx_spend_student_ts ON spend_log (student_id, ts);
   `);
+  migrateSpendLogKinds(db);
   return db;
 }
 
@@ -133,6 +164,46 @@ class Ledger {
       const balance = this.getBalance(studentId);
       this.#log(studentId, 'debit', amount, balance, meta);
       return { ok: true, balance, charged: amount };
+    });
+  }
+
+  /**
+   * Close out a message: the hold was taken up front against a worst case, and
+   * the real cost is nearly always lower. Refund the difference and record what
+   * actually happened.
+   *
+   * The settle row carries the real usage, so the spend log — not the balance —
+   * is what step 8 reads to calibrate the exchange rate.
+   */
+  settle(studentId, heldTokens, actualMicroUSD, meta = {}) {
+    const held = Math.trunc(heldTokens);
+    let charged = appTokensForMicroUSD(actualMicroUSD);
+
+    // Shouldn't happen: max_tokens is capped to what the balance can cover, so
+    // actual can't exceed the hold. If it ever does, absorb the difference
+    // rather than pushing a student negative — and leave a note saying so.
+    let underHeld = 0;
+    if (charged > held) {
+      underHeld = charged - held;
+      charged = held;
+    }
+    const refund = held - charged;
+
+    return this.#transact(() => {
+      if (refund > 0) {
+        this.db
+          .prepare('UPDATE balances SET tokens = tokens + ?, updated_at = ? WHERE student_id = ?')
+          .run(refund, new Date().toISOString(), studentId);
+      }
+      const balance = this.getBalance(studentId);
+      this.#log(studentId, 'settle', charged, balance, {
+        ...meta,
+        costMicroUSD: actualMicroUSD,
+        note: underHeld
+          ? `${meta.note ? meta.note + '; ' : ''}under-held by ${underHeld} tokens, absorbed`
+          : meta.note ?? null,
+      });
+      return { charged, refunded: refund, held, balance, underHeld };
     });
   }
 
