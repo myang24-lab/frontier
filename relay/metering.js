@@ -78,7 +78,13 @@ function planSpend({ modelId, balanceTokens, estimatedInputTokens, hardCapTokens
 // confusing when you notice and worse when you don't — say so and let the
 // student decide whether to start fresh.
 
-const WARN_AT_BALANCE_FRACTION = 0.25; // one message eating a quarter of the balance
+// Tuned against real data rather than guessed. At 0.25 this fired on ordinary
+// messages in a three-turn conversation: the hold is a worst case and ran about
+// 4x the actual charge (13 tokens held, 3 spent), so a quarter-of-balance hold
+// is a routine event, not a notable one. A warning that fires every time is
+// wallpaper — students stop reading it, including on the message where it
+// matters. 0.5 keeps it rare enough to mean something.
+const WARN_AT_BALANCE_FRACTION = 0.5;
 const WARN_AT_INPUT_TOKENS = 20_000;   // history long enough to dominate the cost
 
 function warningsFor({ plan, balanceTokens, estimatedInputTokens, messageCount }) {
@@ -88,7 +94,10 @@ function warningsFor({ plan, balanceTokens, estimatedInputTokens, messageCount }
   if (balanceTokens > 0 && plan.holdTokens / balanceTokens >= WARN_AT_BALANCE_FRACTION) {
     warnings.push({
       code: 'expensive_message',
-      message: `This message could use up to ${plan.holdTokens} of your ${balanceTokens} tokens.`,
+      // "up to" is load-bearing: the hold is a ceiling, and the refund on
+      // settlement is usually large. Saying "costs" would be a lie the student
+      // catches the moment they see the real charge.
+      message: `This message could use up to ${plan.holdTokens} of your ${balanceTokens} tokens — usually much less.`,
     });
   }
   if (estimatedInputTokens >= WARN_AT_INPUT_TOKENS) {
