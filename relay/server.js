@@ -9,10 +9,17 @@ const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const models = require('./models');
 const pricing = require('./pricing');
+const { Ledger } = require('./ledger');
 
 config.require(); // exits with an actionable message if the key is missing
 
 const anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
+const ledger = new Ledger();
+
+// Topping up a balance by HTTP is a development convenience. Left open on a
+// hosted relay it would be an endpoint that mints free inference for anyone who
+// finds it, so it stays off unless explicitly switched on.
+const ALLOW_DEBUG_CREDIT = process.env.ALLOW_DEBUG_CREDIT === '1';
 
 // Small on purpose — this endpoint exists to prove the key works, not to do real
 // work. Note max_tokens caps thinking *and* response text together, and thinking
@@ -285,6 +292,37 @@ const server = http.createServer((req, res) => {
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
       models: models.ALLOWED,
     });
+  }
+
+  // GET /balance/:studentId
+  if (req.method === 'GET' && url.startsWith('/balance/')) {
+    const studentId = decodeURIComponent(url.slice('/balance/'.length));
+    if (!studentId) return fail(res, 400, 'missing_student', 'Include a student id: /balance/:studentId');
+    return json(res, 200, {
+      studentId,
+      tokens: ledger.getBalance(studentId),
+      microUSDPerToken: require('./ledger').MICRO_USD_PER_APP_TOKEN,
+    });
+  }
+
+  // POST /debug/credit — development only, see ALLOW_DEBUG_CREDIT above.
+  if (req.method === 'POST' && url === '/debug/credit') {
+    if (!ALLOW_DEBUG_CREDIT) {
+      return fail(res, 403, 'debug_credit_disabled', 'Crediting over HTTP is off. Start the relay with ALLOW_DEBUG_CREDIT=1 to enable it in development.');
+    }
+    return readJson(req)
+      .then((body) => {
+        const { studentId, tokens } = body;
+        if (typeof studentId !== 'string' || !studentId.trim()) {
+          return fail(res, 400, 'missing_student', 'Send a "studentId" string.');
+        }
+        if (!Number.isInteger(tokens) || tokens <= 0) {
+          return fail(res, 400, 'invalid_amount', 'Send "tokens" as a positive whole number.');
+        }
+        const result = ledger.credit(studentId, tokens, { note: 'debug credit' });
+        json(res, 200, { studentId, ...result });
+      })
+      .catch((e) => fail(res, 400, e.code || 'invalid_body', e.message));
   }
 
   if (req.method === 'POST' && url === '/message') {

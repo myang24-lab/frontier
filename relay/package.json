@@ -5,7 +5,8 @@
   "description": "Frontier-tier relay: holds the Claude API key and the token ledger. Never runs on a student machine.",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "check:concurrency": "node scripts/concurrency-check.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0"
