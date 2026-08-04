@@ -8,6 +8,7 @@ const http = require('http');
 const Anthropic = require('@anthropic-ai/sdk');
 const config = require('./config');
 const models = require('./models');
+const pricing = require('./pricing');
 
 config.require(); // exits with an actionable message if the key is missing
 
@@ -181,7 +182,8 @@ async function handleDebugMessage(req, res) {
       text,
       stop_reason: message.stop_reason,
       truncated: message.stop_reason === 'max_tokens',
-      usage: message.usage, // raw, unmassaged — step 5 prices this shape
+      usage: message.usage,
+      cost: pricing.costOf(model, message.usage),
     });
   } catch (err) {
     const [status, code, message] = describeApiError(err);
@@ -258,7 +260,10 @@ async function handleStreamMessage(req, res) {
       refused: message.stop_reason === 'refusal',
       stop_details: message.stop_details || null,
       truncated: message.stop_reason === 'max_tokens',
-      usage: message.usage, // step 5 prices this; step 7 settles against it
+      usage: message.usage,
+      // What this message actually cost. Step 7 settles the ledger against
+      // exactly this number.
+      cost: pricing.costOf(model, message.usage),
     });
   } catch (err) {
     const [, code, message] = describeApiError(err);
