@@ -40,7 +40,13 @@ const DEBUG_MAX_TOKENS = 4096;
 // could name this, a student could ask for 128k of Fable 5 output in one go.
 // This is a hard cap on runaway length, not a budget — step 7's balance check
 // is what actually stops overspending.
-const STREAM_MAX_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS) || 8000;
+//
+// Pinned to 4000 to match the step-8 calibration run. Every fable-5/max sample
+// in that sweep hit this ceiling, so the measured cost is the worst case only
+// while the two numbers agree. Raising this without re-running `npm run
+// calibrate` would let a single message cost roughly double what the exchange
+// rate was derived against.
+const STREAM_MAX_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS) || 4000;
 
 const startedAt = Date.now();
 

@@ -42,8 +42,9 @@ test('the hold never exceeds the balance', () => {
 
 test('a balance too small for a useful reply is refused, not truncated', () => {
   // Better an honest "out of tokens" than a reply cut off mid-sentence that the
-  // student still paid for.
-  const p = plan({ balanceTokens: 1 });
+  // student still paid for. A long prompt eats most of one token's budget,
+  // leaving too little output to be worth generating.
+  const p = plan({ balanceTokens: 1, estimatedInputTokens: 1500 });
   assert.strictEqual(p.ok, false);
   assert.strictEqual(p.reason, 'insufficient_balance');
   assert.ok(p.neededTokens > 1);

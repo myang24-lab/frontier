@@ -20,14 +20,38 @@ const path = require('path');
 const { DatabaseSync } = require('node:sqlite');
 
 // ── Exchange rate ────────────────────────────────────────────────────────────
-// How much real money one app token is worth. PLACEHOLDER — step 8 replaces
-// this with a value derived from measured usage across both models and all
-// five effort levels.
+// How much real money one app token is worth: $0.0083.
 //
-// Working figure: 4000 micro-dollars = $0.004 per app token. On the numbers
-// recorded in step 3, that puts a medium-effort Opus 5 message at ~5 tokens and
-// a max-effort one at ~10.
-const MICRO_USD_PER_APP_TOKEN = 4000;
+// Derived, not chosen. `npm run calibrate` ran 12 representative student
+// prompts across both models at low/medium/max — 72 real calls, $4.91 — and
+// the medians came out as:
+//
+//     opus-5   low $0.0332   medium $0.0514   max $0.0766
+//     fable-5  low $0.0475   medium $0.0497   max $0.2004
+//
+// Two design targets were set before measuring: a typical Opus 5 message at
+// medium effort should cost ~5 tokens, and a max-effort Fable 5 message ~30.
+// Those imply different rates (10282 and 6679 microUSD/token respectively),
+// because the real cost ratio between those two messages isn't 6:1. The rate
+// below is the geometric mean, which honours both targets without letting
+// either dominate.
+//
+// What it produces in practice:
+//     opus-5  @ low     4 tokens      fable-5 @ low      6 tokens
+//     opus-5  @ medium  7 tokens      fable-5 @ medium   6 tokens
+//     opus-5  @ max    10 tokens      fable-5 @ max     25 tokens
+//
+// A student arriving with the 60-80 tokens earned on the local track can send
+// ~10 medium Opus 5 messages, or 2 max-effort Fable 5 ones. That's room to
+// experiment on the workhorse while the top tier stays a deliberate choice.
+//
+// Caveat worth keeping in mind: every fable-5/max sample hit the 4000-token
+// cap, so that $0.2004 is a floor. STREAM_MAX_TOKENS in server.js is pinned to
+// the same 4000 so the measured worst case is the real worst case — raising it
+// re-opens a gap between what was calibrated and what students can spend.
+//
+// Re-derive with `npm run calibrate` if prices change or the model set does.
+const MICRO_USD_PER_APP_TOKEN = 8300;
 
 // Students are never charged a fraction of a token, and rounding down would let
 // a stream of cheap messages cost nothing at all. Always round up.

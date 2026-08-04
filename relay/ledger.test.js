@@ -4,7 +4,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { Ledger, appTokensForMicroUSD } = require('./ledger');
+const { Ledger, appTokensForMicroUSD, MICRO_USD_PER_APP_TOKEN } = require('./ledger');
 
 let n = 0;
 function freshLedger() {
@@ -109,16 +109,17 @@ test('settle charges the real cost and refunds the rest of the hold', () => {
   ledger.debit('s7', 10, { note: 'hold' });
   assert.strictEqual(ledger.getBalance('s7'), 10);
 
-  // Real cost came in at $0.012 = 3 tokens. Seven go back.
-  const outcome = ledger.settle('s7', 10, 12000, { model: 'claude-opus-5', effort: 'low' });
+  // Real cost came in at three tokens' worth. Seven go back.
+  const actualMicroUSD = MICRO_USD_PER_APP_TOKEN * 3;
+  const outcome = ledger.settle('s7', 10, actualMicroUSD, { model: 'claude-opus-5', effort: 'low' });
   assert.strictEqual(outcome.charged, 3);
   assert.strictEqual(outcome.refunded, 7);
   assert.strictEqual(outcome.balance, 17);
   assert.strictEqual(ledger.getBalance('s7'), 17);
 
-  // The settle row carries the real usage — this is what step 8 reads.
+  // The settle row carries the real usage — this is what calibration reads.
   const settleRow = ledger.history('s7').find((e) => e.kind === 'settle');
-  assert.strictEqual(settleRow.cost_micro_usd, 12000);
+  assert.strictEqual(settleRow.cost_micro_usd, actualMicroUSD);
   assert.strictEqual(settleRow.model, 'claude-opus-5');
   cleanup();
 });
@@ -140,7 +141,7 @@ test('an under-held message is absorbed, never pushed negative', () => {
   ledger.credit('s9', 5);
   ledger.debit('s9', 5, { note: 'hold' });
   // Cost came in above the hold — shouldn't be possible, but must be survivable.
-  const outcome = ledger.settle('s9', 5, 40000, {}); // $0.04 = 10 tokens
+  const outcome = ledger.settle('s9', 5, MICRO_USD_PER_APP_TOKEN * 10, {});
   assert.strictEqual(outcome.charged, 5, 'capped at what was held');
   assert.strictEqual(outcome.underHeld, 5);
   assert.strictEqual(ledger.getBalance('s9'), 0);
@@ -151,9 +152,21 @@ test('an under-held message is absorbed, never pushed negative', () => {
 test('cost converts to whole app tokens, always rounding up', () => {
   // Rounding down would make a stream of cheap messages genuinely free.
   assert.strictEqual(appTokensForMicroUSD(0), 0);
-  assert.strictEqual(appTokensForMicroUSD(1), 1);
-  assert.strictEqual(appTokensForMicroUSD(4000), 1);
-  assert.strictEqual(appTokensForMicroUSD(4001), 2);
-  assert.strictEqual(appTokensForMicroUSD(18535), 5); // the real step-3 low-effort message
-  assert.strictEqual(appTokensForMicroUSD(37060), 10); // the real step-3 max-effort message
+  assert.strictEqual(appTokensForMicroUSD(1), 1, 'any nonzero cost is at least one token');
+  assert.strictEqual(appTokensForMicroUSD(MICRO_USD_PER_APP_TOKEN), 1);
+  assert.strictEqual(appTokensForMicroUSD(MICRO_USD_PER_APP_TOKEN + 1), 2);
+});
+
+test('the calibrated rate prices real messages as intended', () => {
+  // Medians from the step-8 sweep (72 real calls). If the rate is ever changed
+  // without re-running `npm run calibrate`, these move and this test says so.
+  assert.strictEqual(appTokensForMicroUSD(33200), 4, 'opus-5 @ low');
+  assert.strictEqual(appTokensForMicroUSD(51400), 7, 'opus-5 @ medium');
+  assert.strictEqual(appTokensForMicroUSD(76600), 10, 'opus-5 @ max');
+  assert.strictEqual(appTokensForMicroUSD(47500), 6, 'fable-5 @ low');
+  assert.strictEqual(appTokensForMicroUSD(200400), 25, 'fable-5 @ max');
+
+  // A student arriving with the ~70 tokens earned on the local track.
+  assert.strictEqual(Math.floor(70 / 7), 10, 'about ten medium Opus 5 messages');
+  assert.strictEqual(Math.floor(70 / 25), 2, 'or two max-effort Fable 5 messages');
 });
