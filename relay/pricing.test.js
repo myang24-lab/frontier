@@ -100,6 +100,37 @@ test('micro-dollars are whole numbers, for drift-free ledger arithmetic', () => 
   assert.strictEqual(c.totalMicroUSD, 2170); // $0.00217
 });
 
+// ── Reasoning split ──────────────────────────────────────────────────────────
+
+test('the exact breakdown is used when the API provides it', () => {
+  const s = require('./pricing').splitOutput(
+    { output_tokens: 1465, output_tokens_details: { thinking_tokens: 551 } },
+    { thinkingChars: 999, textChars: 1 } // ignored — exact wins
+  );
+  assert.strictEqual(s.thinkingTokens, 551);
+  assert.strictEqual(s.visibleTokens, 914);
+  assert.strictEqual(s.estimated, false);
+});
+
+test('streamed responses split the output total by characters', () => {
+  // Streaming omits output_tokens_details, so allocate the known total in
+  // proportion to how much of each kind came down the wire.
+  const s = require('./pricing').splitOutput(
+    { output_tokens: 1000 },
+    { thinkingChars: 3000, textChars: 1000 }
+  );
+  assert.strictEqual(s.thinkingTokens, 750);
+  assert.strictEqual(s.visibleTokens, 250);
+  assert.strictEqual(s.thinkingShare, 0.75);
+  assert.strictEqual(s.estimated, true, 'must be labelled an estimate');
+});
+
+test('no characters and no breakdown yields null, not a fake zero', () => {
+  const s = require('./pricing').splitOutput({ output_tokens: 100 }, {});
+  assert.strictEqual(s.thinkingTokens, null);
+  assert.strictEqual(s.estimated, true);
+});
+
 test('formatUSD keeps sub-cent amounts legible', () => {
   assert.strictEqual(formatUSD(0), '$0.00');
   assert.strictEqual(formatUSD(0.00217), '$0.00217');

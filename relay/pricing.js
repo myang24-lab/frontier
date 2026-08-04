@@ -89,6 +89,39 @@ function costOf(modelId, usage) {
   };
 }
 
+/**
+ * How much of the output was reasoning the student never saw?
+ *
+ * This is the most useful number the feature has for teaching — at max effort
+ * a message can spend 46x more on thinking than at low, while the visible
+ * answer barely grows. But `output_tokens_details.thinking_tokens` is only
+ * returned on non-streaming responses, and every real message is streamed.
+ *
+ * So: when the exact breakdown is there, use it. Otherwise split the known
+ * output total in proportion to the characters of each kind that came down the
+ * stream. Both are prose at a similar characters-per-token ratio, which makes
+ * this close — but it's an estimate, and it says so.
+ */
+function splitOutput(usage, { thinkingChars = 0, textChars = 0 } = {}) {
+  const output = num((usage || {}).output_tokens);
+  const exact = ((usage || {}).output_tokens_details || {}).thinking_tokens;
+
+  if (typeof exact === 'number') {
+    return { thinkingTokens: exact, visibleTokens: output - exact, thinkingShare: output ? exact / output : 0, estimated: false };
+  }
+  const total = thinkingChars + textChars;
+  if (!total || !output) {
+    return { thinkingTokens: null, visibleTokens: null, thinkingShare: null, estimated: true };
+  }
+  const thinkingTokens = Math.round((output * thinkingChars) / total);
+  return {
+    thinkingTokens,
+    visibleTokens: output - thinkingTokens,
+    thinkingShare: thinkingChars / total,
+    estimated: true,
+  };
+}
+
 // Costs here run to fractions of a cent, so the usual 2dp is useless.
 function formatUSD(usd) {
   if (usd === 0) return '$0.00';
@@ -98,6 +131,7 @@ function formatUSD(usd) {
 
 module.exports = {
   costOf,
+  splitOutput,
   formatUSD,
   CACHE_READ_MULTIPLIER,
   CACHE_WRITE_5M_MULTIPLIER,

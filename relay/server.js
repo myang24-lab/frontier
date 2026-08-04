@@ -412,9 +412,18 @@ async function handleStreamMessage(req, res) {
     'X-Accel-Buffering': 'no', // stops proxies buffering the stream into one lump
   });
 
+  // `destroyed` matters as much as `writableEnded`: when a student closes the
+  // tab the socket is gone but the response object hasn't been ended, and
+  // writing to it produces noise instead of an error anyone can act on.
   const send = (event, data) => {
-    if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (res.writableEnded || res.destroyed) return;
+    try {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    } catch (e) {
+      /* client vanished mid-write; settlement still happens below */
+    }
   };
+  res.on('error', () => { /* client vanished; nothing to do but not crash */ });
 
   send('start', {
     model,
@@ -436,6 +445,11 @@ async function handleStreamMessage(req, res) {
   let stream;
   let settled = false;
   let outputChars = 0;
+  // Tracked separately so the student can be shown how much of what they paid
+  // for was reasoning rather than answer.
+  let thinkingChars = 0;
+  let textChars = 0;
+  let clientCancelled = false;
 
   const settle = (actualMicroUSD, note) => {
     if (settled) return null;
@@ -448,10 +462,16 @@ async function handleStreamMessage(req, res) {
     });
   };
 
-  // If the student closes the tab, stop generating — but still settle, because
-  // whatever was produced before the abort was genuinely billed.
+  // Stopping is a real affordance, not an edge case: at max effort a student
+  // waits 25-37 seconds before the first word, and some will change their mind.
+  //
+  // Stopping halts generation but does NOT make the message free — tokens
+  // already produced were genuinely billed to us, so they are genuinely
+  // charged. The unused remainder of the hold comes back. The UI has to say
+  // this plainly, or "stop" reads as "cancel, no charge".
   req.on('close', () => {
     if (stream && !settled) {
+      clientCancelled = true;
       try { stream.abort(); } catch (e) { /* already finished */ }
     }
   });
@@ -471,11 +491,13 @@ async function handleStreamMessage(req, res) {
       const delta = event.delta;
       if (delta.type === 'text_delta') {
         outputChars += delta.text.length;
+        textChars += delta.text.length;
         send('text', { text: delta.text });
       } else if (delta.type === 'thinking_delta') {
         // Summarized reasoning — gives the UI something to show during the
         // long pause before the answer starts.
         outputChars += delta.thinking.length;
+        thinkingChars += delta.thinking.length;
         send('thinking', { text: delta.thinking });
       }
     }
@@ -498,6 +520,10 @@ async function handleStreamMessage(req, res) {
       truncated: message.stop_reason === 'max_tokens',
       usage: message.usage,
       cost,
+      // How much of the output was reasoning the student never saw. Estimated
+      // from streamed characters when the API omits the exact breakdown, which
+      // on a streamed response is always.
+      reasoning: pricing.splitOutput(message.usage, { thinkingChars, textChars }),
       // What the student actually paid, and what they have left.
       charged: outcome.charged,
       refunded: outcome.refunded,
@@ -513,15 +539,24 @@ async function handleStreamMessage(req, res) {
     const estimatedMicroUSD =
       metering.microUSDFor(estimatedInputTokens, spec.pricePerMTok.input) +
       metering.microUSDFor(estimatedOutputTokens, spec.pricePerMTok.output);
-    const outcome = settle(estimatedMicroUSD, 'stream failed — cost estimated from streamed output');
+    const outcome = settle(
+      estimatedMicroUSD,
+      clientCancelled ? 'stopped by student — cost estimated from streamed output' : 'stream failed — cost estimated from streamed output'
+    );
 
     const [, code, message] = describeApiError(err);
-    send('error', {
-      code,
-      message,
+    send(clientCancelled ? 'cancelled' : 'error', {
+      code: clientCancelled ? 'cancelled_by_student' : code,
+      message: clientCancelled
+        ? 'Stopped. You were charged for what had already been generated; the rest was returned.'
+        : message,
       charged: outcome ? outcome.charged : 0,
       refunded: outcome ? outcome.refunded : 0,
       balance: outcome ? outcome.balance : ledger.getBalance(studentId),
+      reasoning: pricing.splitOutput(
+        { output_tokens: Math.ceil(outputChars / 4) },
+        { thinkingChars, textChars }
+      ),
       estimated: true,
     });
   } finally {
