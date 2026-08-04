@@ -58,16 +58,28 @@ const ABORT_AFTER_MS = 8000;
     clearTimeout(timer);
   }
 
-  // The relay settles asynchronously once it notices the socket closed.
-  await new Promise((r) => setTimeout(r, 3000));
-
-  const ledger = new Ledger();
-  const balance = ledger.getBalance(STUDENT);
-  const log = ledger.history(STUDENT, 20);
-  const settle = log.find((e) => e.kind === 'settle');
-  ledger.close();
+  // The relay settles asynchronously once it notices the socket closed. Poll
+  // rather than guessing a wait: HOW LONG this takes is the actual finding. If
+  // settlement lands within a second or two the abort reached the API; if it
+  // takes as long as the full response would have, generation carried on and
+  // the abort did nothing but hang up on it.
+  const settleDeadline = Date.now() + 90_000;
+  let settle = null;
+  let balance = null;
+  let waited = 0;
+  while (Date.now() < settleDeadline) {
+    const l = new Ledger();
+    settle = l.history(STUDENT, 20).find((e) => e.kind === 'settle');
+    balance = l.getBalance(STUDENT);
+    l.close();
+    if (settle) break;
+    await new Promise((r) => setTimeout(r, 1000));
+    waited++;
+    if (waited % 10 === 0) console.log(`  ...still waiting for settlement (${waited}s)`);
+  }
 
   console.log(`\n  held             ${held} tokens`);
+  console.log(`  settled after    ${settle ? `${waited}s` : `never (gave up at ${waited}s)`}`);
   console.log(`  settled          ${settle ? `${settle.app_tokens} tokens charged` : 'NO SETTLEMENT'}`);
   console.log(`  note             ${settle ? settle.note : '—'}`);
   console.log(`  final balance    ${balance}  (of 40)`);
@@ -79,6 +91,15 @@ const ABORT_AFTER_MS = 8000;
   if (balance > 40) failures.push(`balance ${balance} exceeds the 40 credited — tokens were invented`);
   if (settle && !/stopped by student/.test(settle.note || '')) {
     failures.push(`settlement not labelled as a student stop: "${settle.note}"`);
+  }
+  // The point of stopping is to stop paying. If settlement only arrives around
+  // when the full response would have finished, generation ran to completion
+  // and the student was charged for output they explicitly cancelled.
+  if (settle && waited > 20) {
+    failures.push(
+      `settlement took ${waited}s — the abort did not stop generation, so stopping saved nothing. ` +
+        `Expected a couple of seconds.`
+    );
   }
 
   if (failures.length) {
