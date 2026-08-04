@@ -469,12 +469,23 @@ async function handleStreamMessage(req, res) {
   // already produced were genuinely billed to us, so they are genuinely
   // charged. The unused remainder of the hold comes back. The UI has to say
   // this plainly, or "stop" reads as "cancel, no charge".
-  req.on('close', () => {
-    if (stream && !settled) {
-      clientCancelled = true;
+  //
+  // Listen on both req and res: which one fires on a dropped connection varies
+  // with how the client disconnects, and missing it means the model keeps
+  // generating — billing the student for output nobody will ever see.
+  let clientGone = false;
+  const onClientGone = () => {
+    if (clientGone || settled) return;
+    clientGone = true;
+    clientCancelled = true;
+    console.log(`[cancel] ${studentId} disconnected after ${outputChars} chars — aborting generation`);
+    if (stream) {
       try { stream.abort(); } catch (e) { /* already finished */ }
     }
-  });
+  };
+  req.on('close', onClientGone);
+  res.on('close', onClientGone);
+  req.on('aborted', onClientGone);
 
   try {
     const request = buildRequest({ messages: conversation, model, effort, maxTokens: plan.maxTokens });
@@ -485,6 +496,12 @@ async function handleStreamMessage(req, res) {
     stream = SERVER_SIDE_FALLBACK
       ? anthropic.beta.messages.stream({ ...request, ...SERVER_SIDE_FALLBACK })
       : anthropic.messages.stream(request);
+
+    // The client can vanish during the countTokens/hold work above, before
+    // `stream` exists for onClientGone to abort. Catch that here.
+    if (clientGone) {
+      try { stream.abort(); } catch (e) { /* nothing started yet */ }
+    }
 
     for await (const event of stream) {
       if (event.type !== 'content_block_delta') continue;
