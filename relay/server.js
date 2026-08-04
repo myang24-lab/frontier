@@ -121,14 +121,55 @@ function describeApiError(err) {
   return [500, 'api_error', err && err.message ? err.message : 'Unknown error calling the Claude API.'];
 }
 
-// Shared by both endpoints so validation can't drift between them.
-// Returns { error: [code, message] } or { prompt, model, effort }.
-function validateMessageBody(body) {
-  const { prompt, model, effort } = body;
+// A conversation is resent in full on every turn — the API has no memory
+// between calls. This is the ceiling on that; past it, cost per message climbs
+// and the student should start a fresh conversation.
+const MAX_MESSAGES = 200;
 
-  if (typeof prompt !== 'string' || !prompt.trim()) {
-    return { error: ['missing_prompt', 'Send a non-empty "prompt" string.'] };
+// Accepts either a conversation (`messages`) or a single `prompt`, and returns
+// the conversation form. The prompt form is what the debug endpoint and the
+// calibration script use.
+function normaliseMessages(body) {
+  if (Array.isArray(body.messages)) {
+    const { messages } = body;
+    if (!messages.length) return { error: ['empty_conversation', 'Send at least one message.'] };
+    if (messages.length > MAX_MESSAGES) {
+      return { error: ['conversation_too_long', `A conversation is capped at ${MAX_MESSAGES} messages. Start a new one.`] };
+    }
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if (!m || (m.role !== 'user' && m.role !== 'assistant')) {
+        return { error: ['invalid_message', `messages[${i}].role must be "user" or "assistant".`] };
+      }
+      if (typeof m.content !== 'string' || !m.content.trim()) {
+        return { error: ['invalid_message', `messages[${i}].content must be a non-empty string.`] };
+      }
+      // The API rejects these itself, but catching them here means a clear
+      // message instead of a 400 from somewhere deeper.
+      const expected = i % 2 === 0 ? 'user' : 'assistant';
+      if (m.role !== expected) {
+        return { error: ['invalid_message', `messages must alternate starting with "user"; messages[${i}] is "${m.role}", expected "${expected}".`] };
+      }
+    }
+    if (messages[messages.length - 1].role !== 'user') {
+      return { error: ['invalid_message', 'The last message must be from "user" — that is the one being answered.'] };
+    }
+    return { messages };
   }
+
+  if (typeof body.prompt === 'string' && body.prompt.trim()) {
+    return { messages: [{ role: 'user', content: body.prompt }] };
+  }
+  return { error: ['missing_prompt', 'Send either a "messages" array or a non-empty "prompt" string.'] };
+}
+
+// Shared by all endpoints so validation can't drift between them.
+// Returns { error: [code, message] } or { messages, model, effort }.
+function validateMessageBody(body) {
+  const { model, effort } = body;
+
+  const normalised = normaliseMessages(body);
+  if (normalised.error) return normalised;
   // Allowlist check happens before any call, so an unknown model never costs
   // anything and never runs at a price we haven't recorded.
   if (typeof model !== 'string' || !models.isAllowed(model)) {
@@ -140,21 +181,27 @@ function validateMessageBody(body) {
   if (effort !== undefined && !models.isValidEffort(effort)) {
     return { error: ['invalid_effort', `"${effort}" is not a valid effort level. Allowed: ${models.EFFORT_LEVELS.join(', ')}.`] };
   }
-  return { prompt, model, effort };
+  return { messages: normalised.messages, model, effort };
 }
 
 // One place that assembles a Claude request, so the model-specific rules in
-// models.js apply identically to the streaming and non-streaming paths.
-function buildRequest({ prompt, model, effort, maxTokens }) {
+// models.js apply identically to every path.
+function buildRequest({ messages, model, effort, maxTokens }) {
   const spec = models.get(model);
-  const request = {
-    model,
-    max_tokens: maxTokens,
-    messages: [{ role: 'user', content: prompt }],
-  };
+  const request = { model, max_tokens: maxTokens, messages };
   if (spec.thinkingParam) request.thinking = spec.thinkingParam;
   // effort lives inside output_config, not at the top level.
   if (effort !== undefined) request.output_config = { effort };
+
+  // Prompt caching. Every turn resends the whole conversation, so without this
+  // a ten-message chat pays full price to reprocess the first nine turns each
+  // time. Cached history bills at ~10%, which is close to a 10x saving on the
+  // long conversations students actually have.
+  //
+  // Only from the second turn onward: a cache write costs a 25% premium, and on
+  // a one-shot message there is no later turn to earn it back.
+  if (messages.length > 1) request.cache_control = { type: 'ephemeral' };
+
   return request;
 }
 
@@ -168,11 +215,11 @@ async function handleDebugMessage(req, res) {
 
   const valid = validateMessageBody(body);
   if (valid.error) return fail(res, 400, valid.error[0], valid.error[1]);
-  const { prompt, model, effort } = valid;
+  const { messages: conversation, model, effort } = valid;
 
   try {
     const message = await anthropic.messages.create(
-      buildRequest({ prompt, model, effort, maxTokens: DEBUG_MAX_TOKENS })
+      buildRequest({ messages: conversation, model, effort, maxTokens: DEBUG_MAX_TOKENS })
     );
 
     // Check stop_reason before reading content. A safety refusal arrives as a
@@ -213,6 +260,63 @@ async function handleDebugMessage(req, res) {
   }
 }
 
+// ── POST /estimate — what would this message cost? ──────────────────────────
+//
+// Token counting is free, so the UI can show a price before the student commits
+// rather than after. This is what makes the effort dial teachable: drag it and
+// watch the number move, without spending anything to find out.
+async function handleEstimate(req, res) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch (e) {
+    return fail(res, 400, e.code || 'invalid_body', e.message);
+  }
+
+  const valid = validateMessageBody(body);
+  if (valid.error) return fail(res, 400, valid.error[0], valid.error[1]);
+  const { messages: conversation, model, effort } = valid;
+
+  const studentId = body.studentId;
+  if (typeof studentId !== 'string' || !studentId.trim()) {
+    return fail(res, 400, 'missing_student', 'Send a "studentId".');
+  }
+
+  let estimatedInputTokens;
+  try {
+    const counted = await anthropic.messages.countTokens({ model, messages: conversation });
+    estimatedInputTokens = counted.input_tokens;
+  } catch (err) {
+    const [status, code, message] = describeApiError(err);
+    return fail(res, status, code, message);
+  }
+
+  const balanceTokens = ledger.getBalance(studentId);
+  const plan = metering.planSpend({
+    modelId: model,
+    balanceTokens,
+    estimatedInputTokens,
+    hardCapTokens: STREAM_MAX_TOKENS,
+  });
+
+  json(res, 200, {
+    studentId,
+    model,
+    effort: effort || models.DEFAULT_EFFORT,
+    balanceTokens,
+    estimatedInputTokens,
+    messageCount: conversation.length,
+    affordable: plan.ok,
+    // The ceiling, not a prediction: what this message costs if the model uses
+    // every token available to it. Nearly always less in practice, which is why
+    // the `done` event reports the refund.
+    maxTokenCost: plan.ok ? plan.holdTokens : null,
+    maxOutputTokens: plan.ok ? plan.maxTokens : null,
+    neededTokens: plan.ok ? null : plan.neededTokens,
+    warnings: metering.warningsFor({ plan, balanceTokens, estimatedInputTokens, messageCount: conversation.length }),
+  });
+}
+
 // ── POST /message — the real path. Server-Sent Events. ──────────────────────
 //
 // Streaming isn't a nicety here. These models think for a long time before the
@@ -228,7 +332,7 @@ async function handleStreamMessage(req, res) {
 
   const valid = validateMessageBody(body);
   if (valid.error) return fail(res, 400, valid.error[0], valid.error[1]);
-  const { prompt, model, effort } = valid;
+  const { messages: conversation, model, effort } = valid;
 
   const studentId = body.studentId;
   if (typeof studentId !== 'string' || !studentId.trim()) {
@@ -241,10 +345,9 @@ async function handleStreamMessage(req, res) {
   // error buried inside a stream it has already started rendering.
   let estimatedInputTokens;
   try {
-    const counted = await anthropic.messages.countTokens({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    // Counts the whole conversation, not just the newest message — the history
+    // is resent every turn and is billed every turn.
+    const counted = await anthropic.messages.countTokens({ model, messages: conversation });
     estimatedInputTokens = counted.input_tokens;
   } catch (err) {
     const [status, code, message] = describeApiError(err);
@@ -320,6 +423,14 @@ async function handleStreamMessage(req, res) {
     heldTokens: plan.holdTokens,
     balanceAfterHold: held.balance,
     maxOutputTokens: plan.maxTokens,
+    messageCount: conversation.length,
+    cached: conversation.length > 1,
+    warnings: metering.warningsFor({
+      plan,
+      balanceTokens,
+      estimatedInputTokens,
+      messageCount: conversation.length,
+    }),
   });
 
   let stream;
@@ -346,7 +457,7 @@ async function handleStreamMessage(req, res) {
   });
 
   try {
-    const request = buildRequest({ prompt, model, effort, maxTokens: plan.maxTokens });
+    const request = buildRequest({ messages: conversation, model, effort, maxTokens: plan.maxTokens });
     // Server-side fallback: a safety classifier can decline a request, and
     // rerouting it server-side recovers the message instead of dead-ending the
     // student. "default" lets Anthropic pick the substitute by refusal
@@ -464,6 +575,12 @@ const server = http.createServer((req, res) => {
         json(res, 200, { studentId, ...result });
       })
       .catch((e) => fail(res, 400, e.code || 'invalid_body', e.message));
+  }
+
+  if (req.method === 'POST' && url === '/estimate') {
+    return handleEstimate(req, res).catch((err) => {
+      fail(res, 500, 'relay_error', err.message || 'Unhandled relay error.');
+    });
   }
 
   if (req.method === 'POST' && url === '/message') {

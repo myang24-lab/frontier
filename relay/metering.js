@@ -71,4 +71,48 @@ function planSpend({ modelId, balanceTokens, estimatedInputTokens, hardCapTokens
   return { ok: true, maxTokens, holdTokens, estimatedInputTokens, worstCaseMicroUSD };
 }
 
-module.exports = { planSpend, microUSDFor, MIN_USEFUL_OUTPUT_TOKENS };
+// ── Cost warnings ────────────────────────────────────────────────────────────
+// A conversation gets more expensive every turn, because the whole history is
+// resent each time. Caching softens that but doesn't remove it. Rather than
+// silently trimming old turns — which makes the model quietly forget things,
+// confusing when you notice and worse when you don't — say so and let the
+// student decide whether to start fresh.
+
+const WARN_AT_BALANCE_FRACTION = 0.25; // one message eating a quarter of the balance
+const WARN_AT_INPUT_TOKENS = 20_000;   // history long enough to dominate the cost
+
+function warningsFor({ plan, balanceTokens, estimatedInputTokens, messageCount }) {
+  const warnings = [];
+  if (!plan.ok) return warnings;
+
+  if (balanceTokens > 0 && plan.holdTokens / balanceTokens >= WARN_AT_BALANCE_FRACTION) {
+    warnings.push({
+      code: 'expensive_message',
+      message: `This message could use up to ${plan.holdTokens} of your ${balanceTokens} tokens.`,
+    });
+  }
+  if (estimatedInputTokens >= WARN_AT_INPUT_TOKENS) {
+    warnings.push({
+      code: 'long_conversation',
+      message:
+        `This conversation is ${estimatedInputTokens.toLocaleString()} tokens long and gets resent every turn, ` +
+        `so each message costs more than the last. Starting a new conversation resets that.`,
+    });
+  }
+  if (messageCount >= 40) {
+    warnings.push({
+      code: 'many_turns',
+      message: `${messageCount} messages in this conversation. A fresh one will be cheaper and often sharper.`,
+    });
+  }
+  return warnings;
+}
+
+module.exports = {
+  planSpend,
+  microUSDFor,
+  warningsFor,
+  MIN_USEFUL_OUTPUT_TOKENS,
+  WARN_AT_BALANCE_FRACTION,
+  WARN_AT_INPUT_TOKENS,
+};

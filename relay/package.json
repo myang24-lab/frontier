@@ -8,6 +8,7 @@
     "test": "node --test",
     "check:concurrency": "node scripts/concurrency-check.js",
     "check:spend": "node scripts/spend-down-check.js",
+    "check:conversation": "node scripts/conversation-check.js",
     "calibrate": "node scripts/calibrate.js"
   },
   "dependencies": {
