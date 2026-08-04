@@ -7,7 +7,8 @@
     "start": "node server.js",
     "test": "node --test",
     "check:concurrency": "node scripts/concurrency-check.js",
-    "check:spend": "node scripts/spend-down-check.js"
+    "check:spend": "node scripts/spend-down-check.js",
+    "calibrate": "node scripts/calibrate.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0"
