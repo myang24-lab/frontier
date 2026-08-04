@@ -5,29 +5,38 @@
 // know. Step 5's cost calculation reads these same rates.
 //
 // Rates are USD per million tokens.
+// `thinking` is on for both models whether we ask or not. We send it explicitly
+// only to set `display: "summarized"`, which turns the reasoning into something
+// the student can watch instead of a long blank pause. The default, "omitted",
+// still streams thinking blocks — but with empty text, which looks broken.
+//
+// If either model ever rejects this shape, this is the one place to change it:
+// dropping `thinkingParam` entirely is always safe (thinking stays on, the
+// student just doesn't see it happening).
+//
+// Do NOT add temperature / top_p / top_k — neither model accepts them.
+// Do NOT send {type:"disabled"} to fable-5; it is a 400.
+const SUMMARIZED_THINKING = { type: 'adaptive', display: 'summarized' };
+
 const MODELS = {
   'claude-opus-5': {
     id: 'claude-opus-5',
     label: 'Claude Opus 5',
     tier: 'workhorse',
     pricePerMTok: { input: 5, output: 25 },
+    thinkingParam: SUMMARIZED_THINKING,
   },
   'claude-fable-5': {
     id: 'claude-fable-5',
     label: 'Claude Fable 5',
     tier: 'frontier',
     pricePerMTok: { input: 10, output: 50 },
+    thinkingParam: SUMMARIZED_THINKING,
     // Requires 30-day data retention. Under zero data retention every request
     // returns a 400 regardless of how valid the payload is.
     requiresDataRetention: true,
   },
 };
-
-// Neither model is sent a `thinking` parameter.
-//   - claude-fable-5: thinking is always on; sending the parameter at all is a 400.
-//   - claude-opus-5: thinking is on by default, so omitting it is the same as
-//     asking for adaptive.
-// Neither accepts temperature / top_p / top_k — don't reintroduce them.
 
 // Effort controls how much the model thinks before answering — and thinking
 // bills as output tokens, so this is the main cost dial students will hold.

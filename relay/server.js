@@ -19,6 +19,12 @@ const anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
 // reasoning. 4096 leaves room for both.
 const DEBUG_MAX_TOKENS = 4096;
 
+// Ceiling for a real streamed message. Deliberately server-side: if the client
+// could name this, a student could ask for 128k of Fable 5 output in one go.
+// This is a hard cap on runaway length, not a budget — step 7's balance check
+// is what actually stops overspending.
+const STREAM_MAX_TOKENS = Number(process.env.MAX_OUTPUT_TOKENS) || 8000;
+
 const startedAt = Date.now();
 
 function json(res, status, body) {
@@ -92,6 +98,43 @@ function describeApiError(err) {
   return [500, 'api_error', err && err.message ? err.message : 'Unknown error calling the Claude API.'];
 }
 
+// Shared by both endpoints so validation can't drift between them.
+// Returns { error: [code, message] } or { prompt, model, effort }.
+function validateMessageBody(body) {
+  const { prompt, model, effort } = body;
+
+  if (typeof prompt !== 'string' || !prompt.trim()) {
+    return { error: ['missing_prompt', 'Send a non-empty "prompt" string.'] };
+  }
+  // Allowlist check happens before any call, so an unknown model never costs
+  // anything and never runs at a price we haven't recorded.
+  if (typeof model !== 'string' || !models.isAllowed(model)) {
+    return { error: ['model_not_allowed', `"${model}" is not an allowed model. Allowed: ${models.ALLOWED.join(', ')}.`] };
+  }
+  // Effort is optional. Reject a bad value rather than silently falling back —
+  // a typo'd "hight" that quietly ran at the default would make the cost numbers
+  // in step 8 wrong and take a long time to notice.
+  if (effort !== undefined && !models.isValidEffort(effort)) {
+    return { error: ['invalid_effort', `"${effort}" is not a valid effort level. Allowed: ${models.EFFORT_LEVELS.join(', ')}.`] };
+  }
+  return { prompt, model, effort };
+}
+
+// One place that assembles a Claude request, so the model-specific rules in
+// models.js apply identically to the streaming and non-streaming paths.
+function buildRequest({ prompt, model, effort, maxTokens }) {
+  const spec = models.get(model);
+  const request = {
+    model,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }],
+  };
+  if (spec.thinkingParam) request.thinking = spec.thinkingParam;
+  // effort lives inside output_config, not at the top level.
+  if (effort !== undefined) request.output_config = { effort };
+  return request;
+}
+
 async function handleDebugMessage(req, res) {
   let body;
   try {
@@ -100,36 +143,14 @@ async function handleDebugMessage(req, res) {
     return fail(res, 400, e.code || 'invalid_body', e.message);
   }
 
-  const { prompt, model, effort } = body;
-
-  if (typeof prompt !== 'string' || !prompt.trim()) {
-    return fail(res, 400, 'missing_prompt', 'Send a non-empty "prompt" string.');
-  }
-
-  // Allowlist check happens before any call, so an unknown model never costs
-  // anything and never runs at a price we haven't recorded.
-  if (typeof model !== 'string' || !models.isAllowed(model)) {
-    return fail(res, 400, 'model_not_allowed', `"${model}" is not an allowed model. Allowed: ${models.ALLOWED.join(', ')}.`);
-  }
-
-  // Effort is optional. Reject a bad value rather than silently falling back —
-  // a typo'd "hight" that quietly ran at the default would make the cost numbers
-  // in step 8 wrong and take a long time to notice.
-  if (effort !== undefined && !models.isValidEffort(effort)) {
-    return fail(res, 400, 'invalid_effort', `"${effort}" is not a valid effort level. Allowed: ${models.EFFORT_LEVELS.join(', ')}.`);
-  }
+  const valid = validateMessageBody(body);
+  if (valid.error) return fail(res, 400, valid.error[0], valid.error[1]);
+  const { prompt, model, effort } = valid;
 
   try {
-    // No `thinking`, no temperature/top_p/top_k — see the notes in models.js.
-    const request = {
-      model,
-      max_tokens: DEBUG_MAX_TOKENS,
-      messages: [{ role: 'user', content: prompt }],
-    };
-    // effort lives inside output_config, not at the top level.
-    if (effort !== undefined) request.output_config = { effort };
-
-    const message = await anthropic.messages.create(request);
+    const message = await anthropic.messages.create(
+      buildRequest({ prompt, model, effort, maxTokens: DEBUG_MAX_TOKENS })
+    );
 
     // Check stop_reason before reading content. A safety refusal arrives as a
     // successful 200 with an empty content array; indexing content[0] blindly
@@ -168,6 +189,85 @@ async function handleDebugMessage(req, res) {
   }
 }
 
+// ── POST /message — the real path. Server-Sent Events. ──────────────────────
+//
+// Streaming isn't a nicety here. These models think for a long time before the
+// first visible token, and a non-streaming request at a large max_tokens risks
+// an HTTP timeout with nothing to show for the tokens already paid for.
+async function handleStreamMessage(req, res) {
+  let body;
+  try {
+    body = await readJson(req);
+  } catch (e) {
+    return fail(res, 400, e.code || 'invalid_body', e.message);
+  }
+
+  const valid = validateMessageBody(body);
+  if (valid.error) return fail(res, 400, valid.error[0], valid.error[1]);
+  const { prompt, model, effort } = valid;
+
+  // Everything below this line is streamed, so the status code is already
+  // committed — failures arrive as an `error` event, not an HTTP status.
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // stops proxies buffering the stream into one lump
+  });
+
+  const send = (event, data) => {
+    if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  send('start', { model, effort: effort || models.DEFAULT_EFFORT });
+
+  let stream;
+  // If the student closes the tab, stop generating. Tokens already produced are
+  // still billed, but there's no reason to keep paying for output nobody reads.
+  req.on('close', () => {
+    if (stream && !res.writableEnded) {
+      try { stream.abort(); } catch (e) { /* already finished */ }
+    }
+  });
+
+  try {
+    stream = anthropic.messages.stream(
+      buildRequest({ prompt, model, effort, maxTokens: STREAM_MAX_TOKENS })
+    );
+
+    for await (const event of stream) {
+      if (event.type !== 'content_block_delta') continue;
+      const delta = event.delta;
+      if (delta.type === 'text_delta') {
+        send('text', { text: delta.text });
+      } else if (delta.type === 'thinking_delta') {
+        // Summarized reasoning — gives the UI something to show during the
+        // long pause before the answer starts.
+        send('thinking', { text: delta.thinking });
+      }
+    }
+
+    const message = await stream.finalMessage();
+
+    // Check stop_reason before trusting content. A safety refusal arrives as a
+    // successful response with empty content.
+    send('done', {
+      model: message.model,
+      effort: effort || models.DEFAULT_EFFORT,
+      stop_reason: message.stop_reason,
+      refused: message.stop_reason === 'refusal',
+      stop_details: message.stop_details || null,
+      truncated: message.stop_reason === 'max_tokens',
+      usage: message.usage, // step 5 prices this; step 7 settles against it
+    });
+  } catch (err) {
+    const [, code, message] = describeApiError(err);
+    send('error', { code, message });
+  } finally {
+    if (!res.writableEnded) res.end();
+  }
+}
+
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
 
@@ -179,6 +279,13 @@ const server = http.createServer((req, res) => {
       keyConfigured: true,
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
       models: models.ALLOWED,
+    });
+  }
+
+  if (req.method === 'POST' && url === '/message') {
+    return handleStreamMessage(req, res).catch((err) => {
+      if (!res.headersSent) fail(res, 500, 'relay_error', err.message || 'Unhandled relay error.');
+      else res.end();
     });
   }
 
