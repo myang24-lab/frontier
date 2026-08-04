@@ -1,0 +1,12 @@
+node_modules/
+
+# Secrets — never commit. relay/.env holds the Anthropic API key.
+.env
+*.env
+!.env.example
+
+# Ledger database (step 6) — local state, not source.
+*.sqlite
+*.sqlite-journal
+
+.DS_Store

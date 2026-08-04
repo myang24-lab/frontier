@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// When served by the local bridge (http://localhost:3001), load React/Babel from
+// vendored copies so the app works fully offline. file:// falls back to CDN.
+if (location.protocol.startsWith('http')) {
+  window.__resources = {
+    'https://unpkg.com/react@18.3.1/umd/react.production.min.js': '/vendor/react.js',
+    'https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js': '/vendor/react-dom.js',
+    'https://unpkg.com/@babel/standalone@7.29.0/babel.min.js': '/vendor/babel.js',
+  };
+}
+</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<script>
+(function () {
+  var local = location.protocol.startsWith('http');
+  var css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = local ? '/vendor/xterm.css' : 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css';
+  document.head.appendChild(css);
+  var js = document.createElement('script');
+  js.src = local ? '/vendor/xterm.js' : 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js';
+  document.head.appendChild(js);
+})();
+</script>
+<style>
+body{margin:0;background:#FAF9F5;color:#26241E;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#C15F3C}a:hover{color:#A24E30}
+button,input,textarea{font:inherit;color:inherit}
+input:focus,textarea:focus,button:focus{outline:none}
+::selection{background:rgba(193,95,60,.18)}
+@keyframes haloPulse{0%{transform:scale(1);opacity:.55}70%{transform:scale(2.4);opacity:0}100%{transform:scale(2.4);opacity:0}}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes pillBounce{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes glowPulse{0%{box-shadow:0 0 0 0 rgba(199,144,20,.5)}100%{box-shadow:0 0 26px 8px rgba(199,144,20,0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes modalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes backdropIn{from{opacity:0}to{opacity:1}}
+@keyframes shimmerBurst{from{transform:translate(-50%,-50%) scale(.2);opacity:.9}to{transform:translate(-50%,-50%) scale(3);opacity:0}}
+@keyframes particleFly{to{transform:translate(var(--dx),var(--dy)) scale(.15);opacity:0}}
+@keyframes lockOut{to{opacity:0;transform:scale(.5)}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#FAF9F5" data-screen-label="Local AI OS">
+
+  <!-- ══ persistent token pill ══ -->
+  <div style="position:fixed;top:16px;right:20px;z-index:250">
+    <div ref="{{ pillRef }}" data-guide="token-pill" style="display:flex;align-items:center;gap:8px;padding:7px 15px;border:1px solid #E7E2D9;border-radius:999px;background:#FFFFFF;font-size:13px;font-weight:600">
+      <sc-if value="{{ tokensUnlocked }}" hint-placeholder-val="{{ false }}">
+        <span style="width:9px;height:9px;border-radius:50%;background:#C79014;display:block;box-shadow:0 0 6px rgba(199,144,20,.6)"></span>
+        <span style="color:#8A6A0E;font-variant-numeric:tabular-nums">{{ displayTokens }}</span>
+        <span style="color:#B0AA9B;font-weight:500">tokens</span>
+      </sc-if>
+      <sc-if value="{{ tokensLocked }}" hint-placeholder-val="{{ true }}">
+        <span style="position:relative;width:10px;height:8px;background:#C4BFB2;border-radius:2px;display:block;margin-top:4px"><span style="position:absolute;left:2px;top:-5px;width:6px;height:6px;border:1.5px solid #C4BFB2;border-bottom:none;border-radius:5px 5px 0 0;box-sizing:border-box;display:block"></span></span>
+        <span style="color:#B0AA9B;font-weight:500">Tokens</span>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN 1 · MODEL SELECTION ══ -->
+  <sc-if value="{{ isModel }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="01 Model Selection" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18vh 24px 60px;box-sizing:border-box">
+      <div style="width:100%;max-width:540px;animation:fadeUp .5s ease both">
+        <div style="font-size:11px;letter-spacing:.22em;font-weight:600;color:#A9A492;margin-bottom:22px">LOCAL AI OS</div>
+        <h1 style="font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:42px;line-height:1.15;margin:0 0 10px;letter-spacing:-.01em">Which model do you want to run?</h1>
+        <p style="color:#8A8578;font-size:15px;line-height:1.6;margin:0 0 40px">It runs entirely on your machine. You can switch any time.</p>
+        <div style="position:relative">
+          <button onClick="{{ toggleDropdown }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;background:#FFFFFF;border:1px solid #E7E2D9;border-radius:12px;cursor:pointer;font-size:15px;text-align:left;box-sizing:border-box">
+            <span style="font-weight:{{ dropWeight }}">{{ dropLabel }}</span>
+            <span style="width:8px;height:8px;border-right:1.5px solid #A9A492;border-bottom:1.5px solid #A9A492;transform:rotate(45deg);margin-top:-4px;flex:none"></span>
+          </button>
+          <sc-if value="{{ dropdownOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:calc(100% + 6px);left:0;right:0;background:#FFFFFF;border:1px solid #E7E2D9;border-radius:12px;box-shadow:0 12px 32px rgba(38,36,30,.08);overflow:hidden;z-index:20;animation:modalIn .18s ease both">
+              <sc-for list="{{ modelOptions }}" as="mo" hint-placeholder-count="5">
+                <div onClick="{{ mo.pick }}" style="padding:13px 18px;cursor:pointer;border-bottom:1px solid #F2EFE8" style-hover="background:#FAF8F3">
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-weight:600;font-size:14.5px">{{ mo.name }}</span>
+                    <span style="{{ mo.dotStyle }}"></span>
+                  </div>
+                  <div style="font-size:13px;color:#8A8578;margin-top:3px">{{ mo.desc }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ hasModel }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ continueToTerminal }}" style="margin-top:28px;background:#C15F3C;color:#FFFFFF;border:none;padding:13px 30px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;animation:fadeUp .35s ease both" style-hover="background:#A24E30">Continue</button>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ SCREEN 2 · TERMINAL DOWNLOAD ══ -->
+  <sc-if value="{{ isTerminal }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="02 Terminal Download" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:11vh 24px 60px;box-sizing:border-box">
+      <div style="width:100%;max-width:700px;animation:fadeUp .5s ease both">
+        <div style="font-size:11px;letter-spacing:.22em;font-weight:600;color:#A9A492;margin-bottom:18px">LOCAL AI OS · SETUP</div>
+        <h1 style="font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:34px;line-height:1.2;margin:0 0 10px">{{ selectedName }} will run locally.</h1>
+        <p style="color:#8A8578;font-size:15px;line-height:1.6;margin:0 0 30px;max-width:540px">Nothing leaves your machine. Pull both models in the terminal below — the small one chats, the bigger one runs sub-agents.</p>
+        <sc-if value="{{ ollamaDown }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:8px;background:rgba(192,68,42,.07);border:1px solid rgba(192,68,42,.3);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13.5px;color:#C0442A;font-weight:600">Ollama isn't running — open the Ollama app (or run <code style="font-family:ui-monospace,Menlo,monospace">ollama serve</code>) first.</div>
+        </sc-if>
+        <sc-for list="{{ pullCmds }}" as="pc" hint-placeholder-count="2">
+          <div style="display:flex;align-items:center;gap:10px;background:#FFFFFF;border:1px solid #E7E2D9;border-radius:10px;padding:12px 14px;margin-bottom:10px">
+            <code style="font-family:ui-monospace,Menlo,monospace;font-size:14px;color:#26241E;flex:1">{{ pc.cmd }}</code>
+            <span style="font-size:11.5px;color:#A9A492">{{ pc.role }}</span>
+            <span style="{{ pc.statusStyle }}">{{ pc.statusLabel }}</span>
+            <button onClick="{{ pc.copy }}" style="border:1px solid #E7E2D9;background:#FAF8F3;border-radius:7px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer;color:#6E6A60" style-hover="border-color:#C15F3C;color:#C15F3C">{{ pc.copyLabel }}</button>
+          </div>
+        </sc-for>
+        <div style="height:12px"></div>
+        <div style="background:#1E1C18;border-radius:12px;overflow:hidden;box-shadow:0 16px 40px rgba(38,36,30,.14)">
+          <div style="display:flex;align-items:center;gap:8px;padding:11px 14px;background:#2A2722">
+            <span style="width:10px;height:10px;border-radius:50%;background:#4A463E;display:block"></span>
+            <span style="width:10px;height:10px;border-radius:50%;background:#4A463E;display:block"></span>
+            <span style="width:10px;height:10px;border-radius:50%;background:#4A463E;display:block"></span>
+            <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#8A8578;margin-left:8px">desktop terminal — {{ termStatus }}</span>
+          </div>
+          <div ref="{{ xtermRef }}" style="height:300px;padding:12px 14px;box-sizing:border-box;display:{{ xtermDisplay }}"></div>
+          <div ref="{{ termRef }}" style="height:300px;overflow-y:auto;padding:16px 18px;font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.7;color:#D8D3C8;box-sizing:border-box;display:{{ mockTermDisplay }}">
+            <sc-for list="{{ termLines }}" as="line" hint-placeholder-count="1">
+              <div style="white-space:pre-wrap">{{ line }}</div>
+            </sc-for>
+            <sc-if value="{{ termCursor }}" hint-placeholder-val="{{ true }}">
+              <span style="display:inline-block;width:8px;height:15px;background:#C15F3C;vertical-align:-2px;animation:blink 1.05s steps(1) infinite"></span>
+            </sc-if>
+          </div>
+        </div>
+        <div style="margin-top:24px;display:flex;align-items:center;gap:14px">
+          <sc-if value="{{ showGrant }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ grantAccess }}" style="background:#C15F3C;color:#FFFFFF;border:none;padding:13px 26px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer" style-hover="background:#A24E30">Grant terminal access</button>
+            <span style="font-size:13px;color:#A9A492">A real shell, scoped to ollama commands — served by the same local bridge as this page.</span>
+          </sc-if>
+          <sc-if value="{{ downloading }}" hint-placeholder-val="{{ false }}">
+            <span style="font-size:13.5px;color:#8A8578">{{ downloadingNote }}</span>
+          </sc-if>
+          <sc-if value="{{ downloadDone }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ enterOS }}" style="background:#C15F3C;color:#FFFFFF;border:none;padding:13px 26px;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;animation:fadeUp .4s ease both" style-hover="background:#A24E30">Open your AI OS →</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ SCREEN 3 / 4 · OS SHELL ══ -->
+  <sc-if value="{{ isOS }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="03 AI Operating System" style="display:flex;height:100vh;overflow:hidden">
+
+      <!-- sidebar -->
+      <div style="width:250px;flex:none;background:#F4F1EA;border-right:1px solid #E7E2D9;display:flex;flex-direction:column;padding:18px 12px 14px;box-sizing:border-box">
+        <div style="font-size:11px;letter-spacing:.2em;font-weight:600;color:#A9A492;padding:0 10px;margin-bottom:16px">LOCAL AI OS</div>
+        <button onClick="{{ addSession }}" style="display:flex;align-items:center;gap:9px;width:100%;border:1px solid #E0DBD0;background:#FFFFFF;border-radius:9px;padding:9px 12px;font-size:13.5px;font-weight:600;cursor:pointer;color:#26241E;box-sizing:border-box" style-hover="border-color:#C15F3C">
+          <span style="font-size:16px;line-height:1;color:#C15F3C;font-weight:400">+</span> New session
+        </button>
+        <div data-guide="chat-nav" style="margin-top:14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;max-height:32vh">
+          <sc-for list="{{ sessionList }}" as="s" hint-placeholder-count="2">
+            <div onClick="{{ s.select }}" style="{{ s.style }}" style-hover="background:#ECE8DE">{{ s.title }}</div>
+          </sc-for>
+        </div>
+        <div style="height:1px;background:#E7E2D9;margin:16px 6px"></div>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div onClick="{{ navQuests }}" data-guide="quests-nav" style="{{ questsNavStyle }}" style-hover="background:#ECE8DE">
+            <span style="flex:1">Quests</span>
+            <sc-if value="{{ questBadge }}" hint-placeholder-val="{{ false }}"><span style="width:7px;height:7px;border-radius:50%;background:#C15F3C;display:block"></span></sc-if>
+          </div>
+          <div onClick="{{ navMarket }}" data-guide="market-nav" style="{{ marketNavStyle }}" style-hover="{{ marketNavHover }}">
+            <span style="flex:1">Marketplace</span>
+            <sc-if value="{{ marketLocked }}" hint-placeholder-val="{{ true }}">
+              <span style="position:relative;width:10px;height:8px;background:#B5AF9F;border-radius:2px;display:block;margin-top:3px"><span style="position:absolute;left:2px;top:-5px;width:6px;height:6px;border:1.5px solid #B5AF9F;border-bottom:none;border-radius:5px 5px 0 0;box-sizing:border-box;display:block"></span></span>
+            </sc-if>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13.5px;color:#B5AF9F;cursor:default">
+            <span style="flex:1">Coding Spaces</span>
+            <span style="position:relative;width:10px;height:8px;background:#B5AF9F;border-radius:2px;display:block;margin-top:3px"><span style="position:absolute;left:2px;top:-5px;width:6px;height:6px;border:1.5px solid #B5AF9F;border-bottom:none;border-radius:5px 5px 0 0;box-sizing:border-box;display:block"></span></span>
+          </div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="border-top:1px solid #E7E2D9;padding:12px 10px 0;display:flex;align-items:center;gap:8px">
+          <span style="{{ liveDotStyle }}"></span>
+          <div>
+            <div style="font-size:12.5px;font-weight:600">{{ selectedName }}</div>
+            <div style="font-size:11px;color:#A9A492">{{ liveLabel }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- main panel -->
+      <div style="flex:1;display:flex;flex-direction:column;min-width:0;position:relative">
+
+        <!-- ── CHAT ── -->
+        <sc-if value="{{ panelChat }}" hint-placeholder-val="{{ true }}">
+          <div data-screen-label="Chat" style="flex:1;display:flex;flex-direction:column;min-height:0">
+            <div ref="{{ msgsRef }}" style="flex:1;overflow-y:auto;padding:56px 24px 24px">
+              <div style="max-width:680px;margin:0 auto">
+                <sc-if value="{{ chatEmpty }}" hint-placeholder-val="{{ true }}">
+                  <div style="padding-top:16vh;text-align:center">
+                    <div style="font-family:'Newsreader',Georgia,serif;font-size:28px;color:#26241E;margin-bottom:10px">Say hello to {{ selectedName }}.</div>
+                    <div style="font-size:14px;color:#8A8578">Runs entirely on your device — no account, no cloud.</div>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ messages }}" as="m" hint-placeholder-count="0">
+                  <sc-if value="{{ m.user }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;justify-content:flex-end;margin:16px 0">
+                      <div style="max-width:72%;background:#EFEBE2;border-radius:14px 14px 4px 14px;padding:10px 15px;font-size:14.5px;line-height:1.55">
+                        <sc-if value="{{ m.img }}" hint-placeholder-val="{{ false }}"><div style="{{ m.imgStyle }}"></div></sc-if>
+                        <span style="white-space:pre-wrap">{{ m.text }}</span>
+                      </div>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ m.ai }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin:16px 0">
+                      <sc-if value="{{ m.sub }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#C15F3C;background:rgba(193,95,60,.08);border-radius:6px;padding:3px 9px;margin-bottom:8px">◈ {{ m.subLabel }}</div>
+                      </sc-if>
+                      <sc-if value="{{ m.err }}" hint-placeholder-val="{{ false }}">
+                        <div style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:#C0442A;background:rgba(192,68,42,.08);border-radius:6px;padding:3px 9px;margin-bottom:8px">⚠ couldn't reach the model</div>
+                      </sc-if>
+                      <div style="font-size:14.5px;line-height:1.68;white-space:pre-wrap">{{ m.text }}<sc-if value="{{ m.cursor }}" hint-placeholder-val="{{ false }}"><span style="display:inline-block;width:8px;height:15px;background:#C15F3C;vertical-align:-2px;margin-left:2px;animation:blink 1.05s steps(1) infinite"></span></sc-if></div>
+                    </div>
+                  </sc-if>
+                </sc-for>
+              </div>
+            </div>
+            <div style="padding:0 24px 22px">
+              <div style="max-width:680px;margin:0 auto">
+                <sc-if value="{{ questHintOn }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;justify-content:center;margin-bottom:10px"><span style="font-size:12px;color:#C15F3C;font-weight:600;background:rgba(193,95,60,.07);border-radius:999px;padding:4px 13px">{{ questHint }}</span></div>
+                </sc-if>
+                <sc-if value="{{ subAgentOwned }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;padding:0 4px">
+                    <div onClick="{{ toggleSub }}" data-guide="sub-toggle" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                      <span style="{{ switchStyle }}"><span style="{{ knobStyle }}"></span></span>
+                      <span style="font-size:12.5px;font-weight:600;color:{{ subLabelColor }}">Sub-agents</span>
+                    </div>
+                    <sc-if value="{{ subAgentOn }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;align-items:center;gap:10px;animation:fadeUp .25s ease both">
+                        <span style="font-size:11.5px;color:#A9A492">low</span>
+                        <input type="range" min="1" max="5" step="1" value="{{ thinking }}" onChange="{{ onThinking }}" style="width:120px;accent-color:#C15F3C">
+                        <span style="font-size:11.5px;color:#A9A492">max</span>
+                        <span style="font-size:12px;font-weight:600;color:#6E6A60">{{ thinkingLabel }}</span>
+                        <sc-if value="{{ tokensUnlocked }}" hint-placeholder-val="{{ false }}">
+                          <span style="font-size:12px;font-weight:600;color:#8A6A0E">− {{ subCost }} tokens / prompt</span>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ attachedImg }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                    <div style="{{ attachedImgStyle }}"></div>
+                    <button onClick="{{ clearAttach }}" style="border:none;background:none;font-size:12px;color:#A9A492;cursor:pointer" style-hover="color:#C15F3C">remove</button>
+                  </div>
+                </sc-if>
+                <div style="display:flex;align-items:center;gap:10px;background:#FFFFFF;border:1px solid #E7E2D9;border-radius:14px;padding:10px 12px;box-shadow:0 2px 10px rgba(38,36,30,.04)">
+                  <button onClick="{{ pickImage }}" title="Attach image" style="width:32px;height:32px;flex:none;border:1px solid #E7E2D9;background:#FAF8F3;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="border-color:#C15F3C">
+                    <span style="width:14px;height:11px;border:1.5px solid #8A8578;border-radius:2px;position:relative;display:block"><span style="position:absolute;left:2px;top:2px;width:3px;height:3px;border-radius:50%;background:#8A8578;display:block"></span></span>
+                  </button>
+                  <input ref="{{ fileRef }}" type="file" accept="image/*" onChange="{{ onFile }}" style="display:none">
+                  <input value="{{ input }}" onChange="{{ onInput }}" onKeyDown="{{ onKey }}" placeholder="{{ inputPlaceholder }}" style="flex:1;border:none;background:none;font-size:14.5px;padding:4px 2px">
+                  <button onClick="{{ sendMsg }}" style="{{ sendStyle }}">↑</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ── QUESTS ── -->
+        <sc-if value="{{ panelQuests }}" hint-placeholder-val="{{ false }}">
+          <div data-screen-label="04 Quests" style="flex:1;overflow-y:auto;padding:56px 32px 40px">
+            <div style="max-width:640px;margin:0 auto;animation:fadeUp .35s ease both">
+              <h1 style="font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:32px;margin:0 0 6px">Quests</h1>
+              <p style="color:#8A8578;font-size:14.5px;margin:0 0 30px">Each quest unlocks a new capability of your OS.</p>
+              <sc-for list="{{ questList }}" as="q" hint-placeholder-count="4">
+                <div style="{{ q.wrapStyle }}">
+                  <div style="flex:none;margin-top:2px">
+                    <sc-if value="{{ q.done }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:24px;height:24px;border-radius:50%;background:#C79014;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">✓</span>
+                    </sc-if>
+                    <sc-if value="{{ q.active }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:24px;height:24px;border-radius:50%;border:2px solid #C15F3C;box-sizing:border-box;display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:50%;background:#C15F3C;display:block"></span></span>
+                    </sc-if>
+                    <sc-if value="{{ q.locked }}" hint-placeholder-val="{{ false }}">
+                      <span style="width:24px;height:24px;display:flex;align-items:center;justify-content:center"><span style="position:relative;width:12px;height:9px;background:#C4BFB2;border-radius:2px;display:block;margin-top:5px"><span style="position:absolute;left:2.5px;top:-6px;width:7px;height:7px;border:1.5px solid #C4BFB2;border-bottom:none;border-radius:6px 6px 0 0;box-sizing:border-box;display:block"></span></span></span>
+                    </sc-if>
+                  </div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:15px;font-weight:600">{{ q.title }}</div>
+                    <div style="font-size:13.5px;color:#8A8578;margin-top:4px;line-height:1.55">{{ q.desc }}</div>
+                    <sc-if value="{{ q.showProgress }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin-top:12px;display:flex;align-items:center;gap:10px">
+                        <div style="flex:1;height:5px;background:#EFEBE2;border-radius:99px;overflow:hidden;max-width:220px"><div style="height:100%;background:#C79014;border-radius:99px;transition:width .5s ease;width:{{ q.progressW }}"></div></div>
+                        <span style="font-size:12px;font-weight:600;color:#8A6A0E">{{ q.progressLabel }}</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ q.showQuizBtn }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ openQuiz }}" style="margin-top:12px;border:1px solid #C15F3C;color:#C15F3C;background:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:rgba(193,95,60,.06)">{{ q.quizLabel }}</button>
+                    </sc-if>
+                    <sc-if value="{{ q.reward }}" hint-placeholder-val="{{ false }}">
+                      <div style="margin-top:10px;font-size:12.5px;font-weight:600;color:#8A6A0E">⟡ {{ q.reward }}</div>
+                    </sc-if>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ── MARKETPLACE ── -->
+        <sc-if value="{{ panelMarket }}" hint-placeholder-val="{{ false }}">
+          <div data-screen-label="Marketplace" style="flex:1;overflow-y:auto;padding:56px 32px 40px">
+            <div style="max-width:760px;margin:0 auto;animation:fadeUp .35s ease both">
+              <h1 style="font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:32px;margin:0 0 6px">Marketplace</h1>
+              <p style="color:#8A8578;font-size:14.5px;margin:0 0 22px">Mirrors of the top open-source AI projects. Free to browse, yours to run.</p>
+              <sc-if value="{{ marketQuestBanner }}" hint-placeholder-val="{{ false }}">
+                <div style="border:1px solid rgba(193,95,60,.35);background:rgba(193,95,60,.05);border-radius:10px;padding:12px 16px;font-size:13.5px;color:#A24E30;margin-bottom:22px;font-weight:500">Quest — find and download the skill that adds <b>sub-agents</b>. Everything else stays locked until you do.</div>
+              </sc-if>
+              <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+                <input data-guide="search" value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search repos…" style="flex:1;border:1px solid #E7E2D9;background:#FFFFFF;border-radius:10px;padding:11px 15px;font-size:14px;box-sizing:border-box">
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">
+                <sc-for list="{{ filterChips }}" as="f" hint-placeholder-count="4">
+                  <button onClick="{{ f.pick }}" style="{{ f.style }}">{{ f.label }}</button>
+                </sc-for>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px">
+                <sc-for list="{{ repoList }}" as="r" hint-placeholder-count="6">
+                  <div data-repo="{{ r.id }}" style="{{ r.cardStyle }}">
+                    <div style="display:flex;align-items:baseline;gap:8px">
+                      <span style="font-family:ui-monospace,Menlo,monospace;font-size:14.5px;font-weight:600">{{ r.name }}</span>
+                      <span style="font-size:11.5px;color:#A9A492">★ {{ r.stars }}</span>
+                    </div>
+                    <div style="font-size:13px;color:#8A8578;line-height:1.5;margin:7px 0 12px;flex:1">{{ r.desc }}</div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                      <span style="font-size:11px;font-weight:600;letter-spacing:.06em;color:#A9A492;text-transform:uppercase">{{ r.catLabel }}</span>
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <span style="{{ r.priceStyle }}">{{ r.priceLabel }}</span>
+                        <button data-guide="{{ r.guideAttr }}" onClick="{{ r.onBtn }}" style="{{ r.btnStyle }}">{{ r.btnLabel }}</button>
+                      </div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ README MODAL ══ -->
+  <sc-if value="{{ readmeOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(38,36,30,.32);backdrop-filter:blur(5px);z-index:300;display:flex;align-items:center;justify-content:center;animation:backdropIn .25s ease both">
+      <div style="width:560px;max-width:92vw;background:#FFFFFF;border-radius:16px;overflow:hidden;box-shadow:0 24px 64px rgba(38,36,30,.25);animation:modalIn .28s cubic-bezier(.22,1,.36,1) both">
+        <div style="padding:18px 24px 14px;border-bottom:1px solid #F0ECE3">
+          <div style="font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:600">swarmkit / README.md</div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+            <div style="flex:1;height:4px;background:#EFEBE2;border-radius:99px;overflow:hidden"><div style="height:100%;background:#C79014;border-radius:99px;transition:width .3s linear;width:{{ dlPctW }}"></div></div>
+            <span style="font-size:11.5px;font-weight:600;color:#8A6A0E;font-variant-numeric:tabular-nums;min-width:86px;text-align:right">{{ dlStatus }}</span>
+          </div>
+        </div>
+        <div ref="{{ readmeRef }}" onScroll="{{ onReadmeScroll }}" style="height:280px;overflow-y:auto;padding:20px 24px;font-size:13.5px;line-height:1.7;color:#4A463E">
+          <p style="margin:0 0 14px"><b style="color:#26241E">swarmkit</b> runs a real sub-agent: your local model (qwen2.5:1.5b) in a loop. It can request one real tool — fetch a URL or local file. Our code runs the tool, feeds the result back, and the loop repeats until the agent has its answer.</p>
+          <p style="margin:0 0 14px"><b style="color:#26241E">The thinking slider</b> sets how many tool loops the agent may run. Low means one quick pass; max allows five rounds of fetch → read → revise. More loops give better answers on research tasks — and cost more tokens.</p>
+          <p style="margin:0 0 14px"><b style="color:#26241E">Cost.</b> Every sub-agent run consumes tokens, scaled by the loop count. Plain chats (sub-agents off) stay free. You earn tokens back just by using your AI, and by completing quests.</p>
+          <p style="margin:0 0 14px"><b style="color:#26241E">Usage.</b> After installing, a Sub-agents toggle appears above the chat composer. Turn it on for prompts that benefit from a source — e.g. "summarize https://example.com" or "read notes.txt and list the action items."</p>
+          <p style="margin:0"><b style="color:#26241E">Good practice.</b> Start at low loops and raise the slider only when the task genuinely needs more rounds. Watch your token balance in the top-right — running out means waiting to earn more.</p>
+        </div>
+        <div style="padding:14px 24px 18px;border-top:1px solid #F0ECE3;display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <span style="font-size:12px;color:#A9A492">{{ readmeHint }}</span>
+          <button data-guide="readme-confirm" onClick="{{ finishInstall }}" style="{{ finishStyle }}">{{ finishLabel }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ QUIZ MODAL ══ -->
+  <sc-if value="{{ quizOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(38,36,30,.32);backdrop-filter:blur(5px);z-index:300;display:flex;align-items:center;justify-content:center;animation:backdropIn .25s ease both">
+      <div data-screen-label="Sub-Agent Quiz" style="width:520px;max-width:92vw;background:#FFFFFF;border-radius:16px;box-shadow:0 24px 64px rgba(38,36,30,.25);animation:modalIn .28s cubic-bezier(.22,1,.36,1) both;padding:26px 28px;box-sizing:border-box;max-height:86vh;overflow-y:auto">
+        <div style="font-size:11px;letter-spacing:.2em;font-weight:600;color:#C15F3C;margin-bottom:8px">QUEST · SUB-AGENT CHECK</div>
+        <h2 style="font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:24px;margin:0 0 6px">Did the README stick?</h2>
+        <p style="font-size:13.5px;color:#8A8578;margin:0 0 20px">Pass to officially unlock sub-agents. You can retake it any time from Quests.</p>
+        <sc-for list="{{ quizQs }}" as="qq" hint-placeholder-count="3">
+          <div style="margin-bottom:18px">
+            <div style="font-size:14px;font-weight:600;margin-bottom:9px">{{ qq.text }}</div>
+            <sc-for list="{{ qq.opts }}" as="o" hint-placeholder-count="3">
+              <div onClick="{{ o.pick }}" style="{{ o.style }}" style-hover="border-color:#C4BFB2">{{ o.label }}</div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <sc-if value="{{ quizFail }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:13px;color:#A24E30;font-weight:600;margin-bottom:12px">Not quite — the highlighted answers are wrong. Give it another try.</div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button onClick="{{ submitQuiz }}" style="{{ quizSubmitStyle }}">Submit answers</button>
+          <button onClick="{{ closeQuiz }}" style="border:none;background:none;font-size:13px;color:#A9A492;cursor:pointer" style-hover="color:#6E6A60">Later</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ TOAST ══ -->
+  <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:350;animation:fadeUp .3s ease both">
+      <div style="background:#26241E;color:#FAF9F5;border-radius:999px;padding:10px 22px;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(38,36,30,.3);display:flex;align-items:center;gap:9px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#E3B23C;display:block"></span>{{ toast }}
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ══ POINTER GUIDE ══ -->
+  <svg ref="{{ gsvgRef }}" style="position:fixed;inset:0;width:100vw;height:100vh;z-index:390;pointer-events:none;display:none">
+    <line ref="{{ glineRef }}" x1="0" y1="0" x2="0" y2="0" stroke="#C15F3C" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.7"></line>
+  </svg>
+  <div ref="{{ guideRef }}" style="position:fixed;left:0;top:0;z-index:400;pointer-events:none;display:none">
+    <span style="position:absolute;left:-14px;top:-14px;width:28px;height:28px;border-radius:50%;background:rgba(193,95,60,.35);animation:haloPulse 1.6s ease-out infinite;display:block"></span>
+    <span style="position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;background:#C15F3C;box-shadow:0 0 12px rgba(193,95,60,.9);display:block"></span>
+    <span ref="{{ glabelRef }}" style="position:absolute;left:16px;top:-9px;white-space:nowrap;background:#26241E;color:#FAF9F5;font-size:12px;font-weight:600;border-radius:7px;padding:4px 11px;display:block"></span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;model&quot;,&quot;options&quot;:[&quot;model&quot;,&quot;os&quot;],&quot;tsType&quot;:&quot;'model'|'os'&quot;,&quot;section&quot;:&quot;Demo&quot;}}">
+class Component extends DCLogic {
+  // ════════════════════════════════════════════════════════════
+  // CONFIG — edit these to point at your local Ollama install.
+  // Everything is real: chat streams from Ollama, the terminal is
+  // a real (scoped) shell, the sub-agent is a real tool loop.
+  // Failures surface as errors — there are no mocked responses.
+  // ════════════════════════════════════════════════════════════
+  static OLLAMA_ENDPOINT = 'http://localhost:11434'; // Ollama (OpenAI-compatible /v1 used for chat)
+  static TERMINAL_WS = 'ws://localhost:3001/pty';    // real terminal bridge (server/server.js)
+  static AGENT_ENDPOINT = 'http://localhost:3001/agent'; // real sub-agent loop (server/agent.py)
+  static AGENT_MODEL = 'qwen2.5:1.5b';               // must match MODEL in server/agent.py
+
+  static MODELS = [
+    { id: 'qwen2.5:0.5b', name: 'Qwen 2.5 · 0.5B', desc: 'Chat model — ~400 MB, ~50 tok/s on a CPU-only 8 GB laptop.' },
+    { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 · 1.5B', desc: 'Sub-agent model — more reliable tool-calling for agent loops.' },
+  ];
+
+  static REPOS = [
+    { id: 'swarmkit', name: 'swarmkit', cat: 'capability', desc: 'A real sub-agent: your local model in a tool loop that can fetch URLs and files.', stars: '42.1k', price: 0 },
+    { id: 'auto-research', name: 'auto-research', cat: 'overnight', desc: 'Queue deep research runs that finish while you sleep.', stars: '38.4k', price: 14 },
+    { id: 'codelens', name: 'codelens', cat: 'coding', desc: 'Repo-aware code search with inline explanations.', stars: '29.7k', price: 10 },
+    { id: 'vault-notes', name: 'vault-notes', cat: 'capability', desc: 'Obsidian-style local knowledge base your model can read.', stars: '25.3k', price: 12 },
+    { id: 'refactor-bot', name: 'refactor-bot', cat: 'coding', desc: 'Automated refactors with test-guarded diffs.', stars: '18.2k', price: 12 },
+    { id: 'nightowl', name: 'nightowl', cat: 'overnight', desc: 'Schedule batch prompts and wake up to results.', stars: '12.9k', price: 8 },
+    { id: 'vision-tag', name: 'vision-tag', cat: 'capability', desc: 'Auto-tag and caption your local photo library.', stars: '9.8k', price: 8 },
+    { id: 'paperpile-sync', name: 'paperpile-sync', cat: 'overnight', desc: 'Summarize new papers into your notes every night.', stars: '7.4k', price: 6 },
+  ];
+
+  static CATS = { coding: 'Coding tool', overnight: 'Overnight script', capability: 'Capability' };
+
+  static QUIZ = [
+    { q: '1. What happens when you send a prompt with sub-agents on?', opts: ['It gets sent to the cloud for more power', 'Your local model runs in a loop, calling a real fetch tool and reading results until done', 'Your prompt is rewritten to be shorter'], a: 1 },
+    { q: '2. What does the thinking slider control?', opts: ['The interface color', 'How many chats you can open at once', 'How many tool loops the agent may run — and the token cost'], a: 2 },
+    { q: '3. What does each sub-agent run consume?', opts: ['A small amount of tokens, scaled by the loop count', 'Your download bandwidth', 'Nothing — runs are always free'], a: 0 },
+  ];
+
+  state = {
+    screen: 'model', panel: 'chat',
+    modelId: null, dropdownOpen: false, copyLabels: {},
+    accessGranted: false, downloadDone: false, termLines: [],
+    ollamaModels: null, // null = Ollama unreachable · array = installed model names
+    sessions: [
+      { id: 1, title: 'Trig identities help', msgs: [
+        { user: true, text: 'Why does sin²x + cos²x = 1?' },
+        { ai: true, text: 'Picture a point on the unit circle: its coordinates are (cos x, sin x), and the distance from the origin is always 1. Apply the Pythagorean theorem to that point and you get sin²x + cos²x = 1 — it\u2019s the circle\u2019s equation in disguise.' },
+      ]},
+      { id: 2, title: 'College essay outline', msgs: [
+        { user: true, text: 'Help me outline my common app essay about running a bakery stand.' },
+        { ai: true, text: 'Lead with a single vivid morning — the 4am alarm, the smell of proofing dough — then zoom out: what the stand taught you about failure (the burnt batch week), iteration, and talking to strangers. End back at the counter, changed. Three acts, one location.' },
+      ]},
+      { id: 3, title: 'New session', msgs: [] },
+    ],
+    activeSession: 2,
+    input: '', attachedImg: null, streaming: false,
+    aiUses: 0, tokens: 0, displayTokens: 0, tokensUnlocked: false,
+    stage: 0, // 0 use-AI ×5 · 1 download skill · 2 quiz · 3 use sub-agent · 4 done
+    owned: {}, search: '', filter: 'all',
+    readmeOpen: false, dlPct: 0, dlDone: false, readmeRead: false,
+    quizOpen: false, quizPicks: [null, null, null], quizFail: false, quizPassed: false,
+    subAgentOn: false, thinking: 2,
+    toast: null, guideStep: null,
+  };
+
+  pillRef = React.createRef(); termRef = React.createRef(); msgsRef = React.createRef(); xtermRef = React.createRef();
+  fileRef = React.createRef(); readmeRef = React.createRef();
+  guideRef = React.createRef(); gsvgRef = React.createRef(); glineRef = React.createRef(); glabelRef = React.createRef();
+
+  componentDidMount() {
+    if (this.props.startScreen === 'os') {
+      this.setState({ screen: 'os', modelId: 'qwen2.5:0.5b' });
+    }
+    this._gp = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    this._guideLoop();
+    this._pollOllama();
+    this._pollInt = setInterval(() => this._pollOllama(), 3000);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this._graf); clearInterval(this._pollInt); clearInterval(this._dlInt); if (this._ws) try { this._ws.close(); } catch (e) {} }
+
+  // ───── Ollama status: poll installed models, drives setup gating + live badge ─────
+  async _pollOllama() {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 1500);
+      const res = await fetch(Component.OLLAMA_ENDPOINT + '/api/tags', { signal: ctrl.signal });
+      clearTimeout(t);
+      const names = (await res.json()).models.map(m => m.name);
+      const bothIn = Component.MODELS.every(m => names.includes(m.id));
+      if (JSON.stringify(names) !== JSON.stringify(this.state.ollamaModels) || bothIn !== this.state.downloadDone) {
+        this.setState({ ollamaModels: names, downloadDone: bothIn });
+      }
+    } catch (e) {
+      if (this.state.ollamaModels !== null) this.setState({ ollamaModels: null, downloadDone: false });
+    }
+  }
+  _hasModel(id) { return !!(this.state.ollamaModels && this.state.ollamaModels.includes(id)); }
+
+  // ───── real terminal (xterm.js + WebSocket → node-pty bridge) ─────
+  _grantAccess() {
+    this.setState({ accessGranted: true });
+    let settled = false, ws;
+    const dead = () => this.setState({ termMode: 'error', termLines: ['✕ bridge unreachable — start it with ./run.sh, then reload this page.'] });
+    try { ws = new WebSocket(Component.TERMINAL_WS); } catch (e) { return dead(); }
+    this._ws = ws;
+    const fallback = setTimeout(() => { if (!settled) { settled = true; try { ws.close(); } catch (e) {} dead(); } }, 1800);
+    ws.onopen = () => { settled = true; clearTimeout(fallback); this._startRealTerm(ws); };
+    ws.onerror = () => { if (!settled) { settled = true; clearTimeout(fallback); dead(); } };
+  }
+  _startRealTerm(ws) {
+    this.setState({ termMode: 'real' });
+    const mount = () => {
+      const el = this.xtermRef.current;
+      if (!el || !window.Terminal) { setTimeout(mount, 120); return; }
+      const term = new window.Terminal({ fontSize: 13, cursorBlink: true, theme: { background: '#1E1C18', foreground: '#D8D3C8', cursor: '#C15F3C' } });
+      term.open(el);
+      this._term = term;
+      term.onData(d => { if (ws.readyState === 1) ws.send(d); });
+      ws.onmessage = (ev) => term.write(ev.data);
+      ws.onclose = () => term.write('\r\n\x1b[90m[bridge disconnected]\x1b[0m\r\n');
+      term.focus();
+    };
+    mount();
+  }
+
+  // ───── pointer guide ─────
+  _guideTargets = {
+    search: { sel: '[data-guide="search"]', label: 'Search for \u201csub-agents\u201d', side: 'left' },
+    download: { sel: '[data-guide="download-swarmkit"]', label: 'Download swarmkit', side: 'left' },
+    readme: { sel: '[data-guide="readme-confirm"]', label: 'Read the README, then finish', side: 'left' },
+    back: { sel: '[data-guide="chat-nav"]', label: 'Head back to your session', side: 'right' },
+  };
+  _guideLoop = () => {
+    this._graf = requestAnimationFrame(this._guideLoop);
+    const dot = this.guideRef.current, svg = this.gsvgRef.current, line = this.glineRef.current, lbl = this.glabelRef.current;
+    if (!dot || !svg) return;
+    const step = this.state.guideStep;
+    const t = step && this._guideTargets[step];
+    const el = t && document.querySelector(t.sel);
+    if (!el) { dot.style.display = 'none'; svg.style.display = 'none'; return; }
+    const r = el.getBoundingClientRect();
+    if (r.width === 0) { dot.style.display = 'none'; svg.style.display = 'none'; return; }
+    let tx, ty, ax, ay;
+    if (t.side === 'right') { tx = r.right + 74; ty = r.top + r.height / 2 - 30; ax = r.right + 6; ay = r.top + r.height / 2; }
+    else { tx = r.left - 64; ty = r.top + r.height / 2 - 34; ax = r.left - 6; ay = r.top + r.height / 2; }
+    tx = Math.max(30, Math.min(window.innerWidth - 40, tx)); ty = Math.max(24, ty);
+    const g = this._gp; g.x += (tx - g.x) * 0.09; g.y += (ty - g.y) * 0.09;
+    dot.style.display = 'block'; svg.style.display = 'block';
+    dot.style.transform = `translate(${g.x}px, ${g.y}px)`;
+    line.setAttribute('x1', g.x); line.setAttribute('y1', g.y);
+    line.setAttribute('x2', ax); line.setAttribute('y2', ay);
+    if (lbl && lbl.textContent !== t.label) lbl.textContent = t.label;
+    if (lbl) { const flip = t.side === 'right' && tx > window.innerWidth - 260; lbl.style.left = flip ? 'auto' : '16px'; lbl.style.right = flip ? '16px' : 'auto'; }
+  };
+
+  // ───── rewards: token animation + bursts ─────
+  _pulsePill() {
+    const el = this.pillRef.current; if (!el) return;
+    el.style.animation = 'none'; void el.offsetWidth;
+    el.style.animation = 'pillBounce .5s ease, glowPulse .8s ease';
+  }
+  changeTokens(delta) {
+    const to = Math.max(0, this.state.tokens + delta);
+    this.setState({ tokens: to });
+    this._pulsePill();
+    const from = this.state.displayTokens, start = performance.now(), dur = 700;
+    cancelAnimationFrame(this._traf);
+    const tick = (now) => {
+      const p = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - p, 3);
+      this.setState({ displayTokens: Math.round(from + (to - from) * e) });
+      if (p < 1) this._traf = requestAnimationFrame(tick);
+    };
+    this._traf = requestAnimationFrame(tick);
+  }
+  burstAt(sel) {
+    const el = document.querySelector(sel); if (!el) return;
+    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const c = document.createElement('div');
+    c.style.cssText = `position:fixed;left:${cx}px;top:${cy}px;z-index:500;pointer-events:none`;
+    const ring = document.createElement('span');
+    ring.style.cssText = 'position:absolute;left:0;top:0;width:56px;height:56px;border-radius:50%;border:2px solid rgba(199,144,20,.8);transform:translate(-50%,-50%);animation:shimmerBurst .7s ease-out both';
+    c.appendChild(ring);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2, d = 42 + Math.random() * 36;
+      const p = document.createElement('span');
+      p.style.cssText = `position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:${i % 3 ? '#C79014' : '#E3B23C'};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px;animation:particleFly ${0.55 + Math.random() * 0.35}s ease-out both`;
+      c.appendChild(p);
+    }
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 1000);
+  }
+  showToast(text, ms = 2800) {
+    this.setState({ toast: text });
+    clearTimeout(this._toastT);
+    this._toastT = setTimeout(() => this.setState({ toast: null }), ms);
+  }
+
+  // ───── chat ─────
+  _scrollMsgs() { const el = this.msgsRef.current; if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; }); }
+  _session() { return this.state.sessions[this.state.activeSession]; }
+
+  async _streamOllama(history, onChunk) {
+    // No abort timer: a cold model can take >10s to load before the first
+    // token. Reachability is checked separately (fast /api/tags ping).
+    const res = await fetch(Component.OLLAMA_ENDPOINT + '/v1/chat/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: this.state.modelId || Component.MODELS[0].id, messages: history, stream: true }),
+    });
+    if (!res.ok || !res.body) throw new Error('ollama http ' + res.status);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n'); buf = parts.pop();
+      for (const p of parts) {
+        const line = p.trim();
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') return;
+        try { const j = JSON.parse(payload); const c = j.choices && j.choices[0].delta && j.choices[0].delta.content; if (c) onChunk(c); } catch (e) {}
+      }
+    }
+  }
+  async _streamAgent(prompt, onChunk) {
+    const res = await fetch(Component.AGENT_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, iterations: this.state.thinking }),
+    });
+    if (!res.ok || !res.body) throw new Error('agent http ' + res.status);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      onChunk(dec.decode(value, { stream: true }));
+    }
+  }
+  // What went wrong, stated plainly — no mock fallback.
+  _explainFailure(subOn, err) {
+    if (this.state.ollamaModels === null)
+      return 'Ollama isn\u2019t running. Start the Ollama app (or run `ollama serve`), then try again.';
+    if (subOn && !this._hasModel(Component.AGENT_MODEL))
+      return `The sub-agent model isn\u2019t installed. Run \`ollama pull ${Component.AGENT_MODEL}\` in the setup terminal (or any terminal), then try again.`;
+    if (!subOn && !this._hasModel(this.state.modelId))
+      return `${this.state.modelId} isn\u2019t installed. Run \`ollama pull ${this.state.modelId}\`, then try again.`;
+    if (subOn)
+      return 'The sub-agent bridge didn\u2019t respond \u2014 make sure the app was started with ./run.sh.' + (err && err.message ? ` (${err.message})` : '');
+    return 'The model didn\u2019t respond' + (err && err.message ? `: ${err.message}` : '.');
+  }
+
+  sendMsg = async () => {
+    const s = this.state;
+    const text = s.input.trim();
+    if ((!text && !s.attachedImg) || s.streaming) return;
+    const sess = this._session();
+    const subOn = s.subAgentOn && this.state.quizPassed;
+    sess.msgs.push({ user: true, text: text || '(image)', img: s.attachedImg, imgStyle: s.attachedImg ? `width:220px;height:150px;background:url(${JSON.stringify(s.attachedImg)}) center/cover no-repeat;border-radius:8px;margin-bottom:8px` : '' });
+    if (sess.title === 'New session' && text) sess.title = text.slice(0, 26) + (text.length > 26 ? '\u2026' : '');
+    const aiMsg = { ai: true, text: '', cursor: true, sub: subOn, subLabel: subOn ? `sub-agent \u00B7 qwen2.5:1.5b \u00B7 ${s.thinking} loop${s.thinking > 1 ? 's' : ''}` : '' };
+    sess.msgs.push(aiMsg);
+    const uses = s.aiUses + 1;
+    this.setState({ input: '', attachedImg: null, streaming: true, aiUses: uses });
+    if (subOn && s.tokensUnlocked) this.changeTokens(-(1 + s.thinking));
+    this._scrollMsgs();
+
+    const onChunk = (chunk) => { aiMsg.text += chunk; this.forceUpdate(); this._scrollMsgs(); };
+    // Full history up to and including the new user message; skip error notices
+    // and the still-empty assistant placeholder.
+    const history = sess.msgs.filter(m => m.text && !m.err).map(m => ({ role: m.user ? 'user' : 'assistant', content: m.text }));
+    try {
+      if (subOn) await this._streamAgent(text, onChunk);
+      else await this._streamOllama(history, onChunk);
+      if (!aiMsg.text) throw new Error('empty');
+    }
+    catch (e) {
+      await this._pollOllama(); // refresh status so the explanation is accurate
+      aiMsg.err = true;
+      aiMsg.text = this._explainFailure(subOn, e);
+    }
+    aiMsg.cursor = false;
+    this.setState({ streaming: false });
+    if (aiMsg.err) return; // failed runs earn no quest progress or tokens
+
+    // quest + economy checks
+    if (this.state.tokensUnlocked) this.changeTokens(2);
+    if (this.state.stage === 0 && uses >= 5) {
+      this.setState({ stage: 1 });
+      setTimeout(() => { this.burstAt('[data-guide="market-nav"]'); this.showToast('Quest complete — Marketplace unlocked'); }, 350);
+    }
+    if (this.state.stage === 3 && subOn) {
+      this.setState({ stage: 4, tokensUnlocked: true });
+      setTimeout(() => {
+        this.changeTokens(50);
+        this.burstAt('[data-guide="token-pill"]');
+        this.showToast('Quest complete — Tokens unlocked \u00B7 +50', 3600);
+      }, 500);
+    }
+  };
+
+  // ───── marketplace / quest flow ─────
+  _enterMarket() {
+    this.setState({ panel: 'market' });
+    if (this.state.stage === 1 && !this.state.owned.swarmkit) {
+      const g = /sub/i.test(this.state.search) || this.state.filter === 'capability' ? 'download' : 'search';
+      this.setState({ guideStep: g });
+    }
+  }
+  _advanceSearch(search, filter) {
+    if (this.state.guideStep === 'search' && (/sub/i.test(search) || filter === 'capability')) this.setState({ guideStep: 'download' });
+    else if (this.state.guideStep === 'download' && !(/sub/i.test(search) || filter === 'capability' || search === '')) this.setState({ guideStep: 'search' });
+  }
+  downloadSwarmkit = () => {
+    this.setState({ readmeOpen: true, dlPct: 0, dlDone: false, readmeRead: false, guideStep: 'readme' });
+    clearInterval(this._dlInt);
+    this._dlInt = setInterval(() => {
+      const p = Math.min(100, this.state.dlPct + 1.5 + Math.random() * 2.5);
+      this.setState({ dlPct: p });
+      if (p >= 100) { clearInterval(this._dlInt); this.setState({ dlDone: true }); }
+    }, 180);
+  };
+  onReadmeScroll = (e) => {
+    const el = e.target;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24 && !this.state.readmeRead) this.setState({ readmeRead: true });
+  };
+  finishInstall = () => {
+    if (!(this.state.dlDone && this.state.readmeRead)) return;
+    const owned = Object.assign({}, this.state.owned, { swarmkit: true });
+    this.setState({ readmeOpen: false, owned, stage: 2, guideStep: 'back' });
+    setTimeout(() => { this.burstAt('[data-repo="swarmkit"]'); this.showToast('swarmkit installed — one more step'); }, 250);
+  };
+  buyRepo(r) {
+    if (!this.state.tokensUnlocked || this.state.tokens < r.price) return;
+    this.changeTokens(-r.price);
+    const owned = Object.assign({}, this.state.owned); owned[r.id] = true;
+    this.setState({ owned });
+    setTimeout(() => this.burstAt(`[data-repo="${r.id}"]`), 150);
+    this.showToast(`${r.name} installed \u00B7 \u2212${r.price} tokens`);
+  }
+
+  _backToChat() {
+    const wasGuiding = this.state.guideStep === 'back';
+    this.setState({ panel: 'chat', guideStep: wasGuiding ? null : this.state.guideStep });
+    if (wasGuiding && this.state.stage === 2 && !this.state.quizPassed) {
+      setTimeout(() => this.setState({ quizOpen: true }), 550);
+    }
+  }
+
+  // ───── quiz ─────
+  submitQuiz = () => {
+    const picks = this.state.quizPicks;
+    if (picks.some(p => p === null)) return;
+    const pass = Component.QUIZ.every((q, i) => picks[i] === q.a);
+    if (!pass) { this.setState({ quizFail: true }); return; }
+    this.setState({ quizOpen: false, quizFail: false, quizPassed: true, stage: this.state.stage <= 2 ? 3 : this.state.stage });
+    setTimeout(() => { this.burstAt('[data-guide="sub-toggle"]') || this.burstAt('[data-guide="quests-nav"]'); this.showToast('Sub-agents unlocked — toggle them on and send a prompt'); }, 400);
+  };
+  openQuiz = () => this.setState({ quizOpen: true, quizFail: false, panel: this.state.panel });
+  closeQuiz = () => this.setState({ quizOpen: false, quizFail: false });
+
+  // ═════ render values ═════
+  renderVals() {
+    const s = this.state;
+    const model = Component.MODELS.find(m => m.id === s.modelId);
+    const navBase = 'display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13.5px;cursor:pointer;';
+    const marketUnlocked = s.stage >= 1;
+    const sess = s.sessions[s.activeSession];
+    const questGate = s.stage === 1 && !s.owned.swarmkit; // marketplace locked-down guided phase
+
+    // quests
+    const mkQuest = (idx, title, desc, reward) => {
+      const done = s.stage > idx, active = s.stage === idx, locked = s.stage < idx;
+      return {
+        title, desc, done, active, locked, reward: done ? reward : null,
+        wrapStyle: `border:1px solid ${active ? 'rgba(193,95,60,.4)' : '#E7E2D9'};border-radius:12px;padding:18px 20px;margin-bottom:12px;background:#FFFFFF;display:flex;gap:14px;align-items:flex-start;opacity:${locked ? '.5' : '1'};transition:opacity .4s`,
+        showProgress: false, showQuizBtn: false,
+      };
+    };
+    const q1 = mkQuest(0, 'Use your AI 5 times', 'Send five prompts to your local model. Anything counts — questions, code, images.', 'Unlocked the Marketplace');
+    q1.showProgress = true;
+    q1.progressW = Math.min(100, (s.aiUses / 5) * 100) + '%';
+    q1.progressLabel = Math.min(5, s.aiUses) + '/5';
+    const q2 = mkQuest(1, 'Open-source skills', 'Visit the Marketplace, find the repo that adds sub-agents, and download it. Read the README while it installs — there\u2019s a check afterwards.', 'swarmkit installed');
+    const q3 = mkQuest(2, 'Sub-agent check', 'A short quiz on what you just read. Pass it to officially unlock sub-agents in your sessions.', 'Sub-agents unlocked');
+    q3.showQuizBtn = s.stage === 2 || s.quizPassed;
+    q3.quizLabel = s.quizPassed ? 'Review quiz' : 'Take the quiz';
+    const q4 = mkQuest(3, 'Run a sub-agent', 'In a session, toggle Sub-agents on and send a prompt. Watch the specialists split the work.', 'Tokens unlocked \u00B7 +50');
+    const q5 = mkQuest(4, 'Token economy', 'Tokens now flow: earn +2 per AI use, spend them on sub-agent runs and new Marketplace skills.', null);
+    if (s.stage >= 4) { q5.done = false; q5.active = true; q5.locked = false; q5.wrapStyle = q5.wrapStyle.replace('opacity:.5', 'opacity:1'); }
+
+    // marketplace
+    const filters = [
+      { id: 'all', label: 'All' }, { id: 'coding', label: 'Coding tools' },
+      { id: 'overnight', label: 'Overnight scripts' }, { id: 'capability', label: 'Capability expansions' },
+    ].map(f => ({
+      label: f.label,
+      pick: () => { this.setState({ filter: f.id }); this._advanceSearch(s.search, f.id); },
+      style: `border:1px solid ${s.filter === f.id ? '#C15F3C' : '#E7E2D9'};background:${s.filter === f.id ? 'rgba(193,95,60,.07)' : '#FFFFFF'};color:${s.filter === f.id ? '#A24E30' : '#6E6A60'};border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:600;cursor:pointer`,
+    }));
+    const q = s.search.toLowerCase();
+    const repoList = Component.REPOS
+      .filter(r => (s.filter === 'all' || r.cat === s.filter) && (!q || (r.name + ' ' + r.desc).toLowerCase().includes(q)))
+      .map(r => {
+        const owned = !!s.owned[r.id];
+        const isTarget = r.id === 'swarmkit';
+        let btnLabel, onBtn = () => {}, enabled = false;
+        if (owned) { btnLabel = 'Installed'; }
+        else if (questGate) {
+          if (isTarget) { btnLabel = 'Download'; enabled = true; onBtn = this.downloadSwarmkit; }
+          else btnLabel = 'Locked';
+        } else if (r.price === 0) { btnLabel = 'Download'; enabled = true; onBtn = () => this.buyRepo(r); }
+        else if (!s.tokensUnlocked) { btnLabel = 'Needs tokens'; }
+        else if (s.tokens < r.price) { btnLabel = 'Not enough'; }
+        else { btnLabel = 'Get'; enabled = true; onBtn = () => this.buyRepo(r); }
+        return {
+          id: r.id, name: r.name, desc: r.desc, stars: r.stars,
+          catLabel: Component.CATS[r.cat],
+          priceLabel: owned ? '' : (r.price === 0 ? 'Free' : r.price + ' tokens'),
+          priceStyle: `font-size:12px;font-weight:600;color:${r.price === 0 ? '#7BA05B' : '#8A6A0E'}`,
+          guideAttr: isTarget && !owned ? 'download-swarmkit' : '',
+          onBtn,
+          btnLabel,
+          btnStyle: owned
+            ? 'border:none;background:rgba(199,144,20,.12);color:#8A6A0E;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:700;cursor:default'
+            : enabled
+              ? 'border:none;background:#C15F3C;color:#FFFFFF;border-radius:8px;padding:7px 16px;font-size:12.5px;font-weight:600;cursor:pointer'
+              : 'border:1px solid #E7E2D9;background:#FAF8F3;color:#B5AF9F;border-radius:8px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:default',
+          cardStyle: `border:1px solid #E7E2D9;border-radius:12px;background:#FFFFFF;padding:16px 18px;display:flex;flex-direction:column;opacity:${questGate && !isTarget ? '.45' : '1'};transition:opacity .4s`,
+        };
+      });
+
+    // quiz
+    const quizQs = Component.QUIZ.map((qq, qi) => ({
+      text: qq.q,
+      opts: qq.opts.map((label, oi) => {
+        const picked = s.quizPicks[qi] === oi;
+        const wrong = s.quizFail && picked && qq.a !== oi;
+        return {
+          label,
+          pick: () => { const p = s.quizPicks.slice(); p[qi] = oi; this.setState({ quizPicks: p, quizFail: false }); },
+          style: `border:1.5px solid ${wrong ? '#C0442A' : picked ? '#C15F3C' : '#E7E2D9'};background:${picked ? 'rgba(193,95,60,.06)' : '#FFFFFF'};border-radius:9px;padding:9px 13px;font-size:13.5px;margin-bottom:7px;cursor:pointer;color:${wrong ? '#C0442A' : '#26241E'}`,
+        };
+      }),
+    }));
+
+    const questHints = {
+      0: `Quest — use your AI 5 times \u00B7 ${Math.min(5, s.aiUses)}/5`,
+      1: 'Quest — the Marketplace is open. Find the sub-agents skill.',
+      2: 'Quest — pass the sub-agent check to unlock them.',
+      3: 'Quest — toggle Sub-agents on and send a prompt.',
+    };
+
+    const subCost = 1 + s.thinking;
+    const canSend = (s.input.trim() || s.attachedImg) && !s.streaming;
+
+    return {
+      // shell
+      isModel: s.screen === 'model', isTerminal: s.screen === 'terminal', isOS: s.screen === 'os',
+      tokensUnlocked: s.tokensUnlocked, tokensLocked: !s.tokensUnlocked, displayTokens: s.displayTokens,
+      pillRef: this.pillRef, toast: s.toast,
+
+      // screen 1
+      modelOptions: Component.MODELS.map(m => ({
+        name: m.name, desc: m.desc,
+        dotStyle: s.modelId === m.id ? 'width:7px;height:7px;border-radius:50%;background:#C15F3C;display:block' : 'display:none',
+        pick: () => this.setState({ modelId: m.id, dropdownOpen: false }),
+      })),
+      dropdownOpen: s.dropdownOpen,
+      toggleDropdown: () => this.setState({ dropdownOpen: !s.dropdownOpen }),
+      dropLabel: model ? model.name : 'Choose a model\u2026',
+      dropWeight: model ? '600' : '400',
+      hasModel: !!model && !s.dropdownOpen,
+      continueToTerminal: () => this.setState({ screen: 'terminal' }),
+
+      // screen 2 — both models must be really installed (verified via Ollama /api/tags)
+      selectedName: model ? model.name : '', selectedId: s.modelId || '',
+      pullCmds: Component.MODELS.map(m => {
+        const installed = this._hasModel(m.id);
+        return {
+          cmd: 'ollama pull ' + m.id,
+          role: m.id === Component.AGENT_MODEL ? 'sub-agent model' : 'chat model',
+          statusStyle: `flex:none;font-size:12px;font-weight:600;color:${installed ? '#7BA05B' : '#B5AF9F'}`,
+          statusLabel: installed ? 'installed \u2713' : 'not installed',
+          copyLabel: s.copyLabels[m.id] || 'Copy',
+          copy: () => {
+            try { navigator.clipboard.writeText('ollama pull ' + m.id); } catch (e) {}
+            this.setState({ copyLabels: Object.assign({}, this.state.copyLabels, { [m.id]: 'Copied \u2713' }) });
+            setTimeout(() => this.setState({ copyLabels: Object.assign({}, this.state.copyLabels, { [m.id]: 'Copy' }) }), 1600);
+          },
+        };
+      }),
+      termRef: this.termRef, xtermRef: this.xtermRef,
+      xtermDisplay: s.termMode === 'real' ? 'block' : 'none',
+      mockTermDisplay: s.termMode === 'real' ? 'none' : 'block',
+      termLines: s.termLines.length ? s.termLines : (s.accessGranted ? [] : ['~ waiting for terminal access\u2026']),
+      termCursor: s.termMode !== 'real',
+      termStatus: s.termMode === 'real' ? 'live shell (scoped to ollama)' : s.termMode === 'error' ? 'bridge unreachable' : 'not connected',
+      ollamaDown: s.ollamaModels === null,
+      showGrant: !s.accessGranted, downloading: s.accessGranted && !s.downloadDone, downloadDone: s.downloadDone,
+      downloadingNote: 'Run both commands above \u2014 each turns green when Ollama reports it installed.',
+      grantAccess: () => this._grantAccess(),
+      enterOS: () => this.setState({ screen: 'os' }),
+
+      // sidebar — live status is real: driven by the /api/tags poll
+      liveDotStyle: `width:8px;height:8px;border-radius:50%;background:${s.ollamaModels === null ? '#C0442A' : this._hasModel(s.modelId) ? '#7BA05B' : '#C79014'};display:block`,
+      liveLabel: s.ollamaModels === null ? 'Ollama offline' : this._hasModel(s.modelId) ? 'running locally' : 'model not installed',
+      sessionList: s.sessions.map((ss, i) => ({
+        title: ss.title,
+        select: () => { this.setState({ activeSession: i }); this._backToChat(); },
+        style: `padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${i === s.activeSession && s.panel === 'chat' ? 'background:#E7E2D6;font-weight:600' : 'color:#6E6A60'}`,
+      })),
+      addSession: () => {
+        const sessions = s.sessions.concat([{ id: Date.now(), title: 'New session', msgs: [] }]);
+        this.setState({ sessions, activeSession: sessions.length - 1 });
+        this._backToChat();
+      },
+      navQuests: () => this.setState({ panel: 'quests' }),
+      questsNavStyle: navBase + (s.panel === 'quests' ? 'background:#E7E2D6;font-weight:600' : 'color:#6E6A60'),
+      questBadge: s.stage < 4 && s.panel !== 'quests',
+      navMarket: () => { if (marketUnlocked) this._enterMarket(); },
+      marketLocked: !marketUnlocked,
+      marketNavStyle: navBase + (marketUnlocked ? (s.panel === 'market' ? 'background:#E7E2D6;font-weight:600' : 'color:#6E6A60') : 'color:#B5AF9F;cursor:default'),
+      marketNavHover: marketUnlocked ? 'background:#ECE8DE' : '',
+
+      // chat
+      panelChat: s.panel === 'chat', panelQuests: s.panel === 'quests', panelMarket: s.panel === 'market',
+      msgsRef: this.msgsRef, messages: sess.msgs, chatEmpty: sess.msgs.length === 0,
+      input: s.input,
+      onInput: (e) => this.setState({ input: e.target.value }),
+      onKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendMsg(); } },
+      inputPlaceholder: 'Message ' + (model ? model.name : 'your model') + '\u2026',
+      sendMsg: this.sendMsg,
+      sendStyle: `width:34px;height:34px;flex:none;border:none;border-radius:9px;font-size:16px;cursor:${canSend ? 'pointer' : 'default'};background:${canSend ? '#C15F3C' : '#EFEBE2'};color:${canSend ? '#FFFFFF' : '#B5AF9F'};transition:background .2s`,
+      fileRef: this.fileRef,
+      pickImage: () => { const el = this.fileRef.current; if (el) el.click(); },
+      onFile: (e) => {
+        const f = e.target.files && e.target.files[0]; if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => this.setState({ attachedImg: rd.result });
+        rd.readAsDataURL(f);
+        e.target.value = '';
+      },
+      attachedImg: s.attachedImg,
+      attachedImgStyle: s.attachedImg ? `width:44px;height:44px;background:url(${JSON.stringify(s.attachedImg)}) center/cover no-repeat;border-radius:8px;border:1px solid #E7E2D9` : '',
+      clearAttach: () => this.setState({ attachedImg: null }),
+      questHintOn: s.stage < 4 && questHints[s.stage] !== undefined && !(s.stage === 2 && s.quizOpen),
+      questHint: questHints[s.stage] || '',
+
+      // sub-agents
+      subAgentOwned: s.quizPassed,
+      subAgentOn: s.subAgentOn,
+      toggleSub: () => this.setState({ subAgentOn: !s.subAgentOn }),
+      switchStyle: `width:34px;height:20px;border-radius:99px;background:${s.subAgentOn ? '#C15F3C' : '#D8D2C4'};position:relative;display:block;transition:background .2s`,
+      knobStyle: `position:absolute;top:2px;left:${s.subAgentOn ? '16px' : '2px'};width:16px;height:16px;border-radius:50%;background:#FFFFFF;display:block;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)`,
+      subLabelColor: s.subAgentOn ? '#C15F3C' : '#8A8578',
+      thinking: s.thinking,
+      onThinking: (e) => this.setState({ thinking: Number(e.target.value) }),
+      thinkingLabel: ['', 'Low', 'Balanced', 'Deep', 'Deeper', 'Max'][s.thinking] + ' thinking',
+      subCost,
+
+      // quests
+      questList: [q1, q2, q3, q4, q5],
+      openQuiz: this.openQuiz,
+
+      // marketplace
+      search: s.search,
+      onSearch: (e) => { const v = e.target.value; this.setState({ search: v }); this._advanceSearch(v, s.filter); },
+      filterChips: filters,
+      repoList,
+      marketQuestBanner: questGate,
+
+      // readme modal
+      readmeOpen: s.readmeOpen, readmeRef: this.readmeRef, onReadmeScroll: this.onReadmeScroll,
+      dlPctW: Math.round(s.dlPct) + '%',
+      dlStatus: s.dlDone ? 'Downloaded \u2713' : 'Downloading ' + Math.round(s.dlPct) + '%',
+      readmeHint: s.readmeRead ? (s.dlDone ? 'Ready.' : 'Nice — just waiting on the download.') : 'Scroll to the end of the README.',
+      finishLabel: s.dlDone && s.readmeRead ? 'Finish install' : (s.dlDone ? 'Read the README first' : 'Installing\u2026'),
+      finishDisabled: !(s.dlDone && s.readmeRead),
+      finishStyle: s.dlDone && s.readmeRead
+        ? 'border:none;background:#C15F3C;color:#FFFFFF;border-radius:9px;padding:10px 20px;font-size:13.5px;font-weight:600;cursor:pointer'
+        : 'border:1px solid #E7E2D9;background:#FAF8F3;color:#B5AF9F;border-radius:9px;padding:10px 20px;font-size:13.5px;font-weight:600;cursor:default',
+      finishInstall: this.finishInstall,
+
+      // quiz modal
+      quizOpen: s.quizOpen, quizQs, quizFail: s.quizFail,
+      submitQuiz: this.submitQuiz, closeQuiz: this.closeQuiz,
+      quizSubmitStyle: s.quizPicks.every(p => p !== null)
+        ? 'border:none;background:#C15F3C;color:#FFFFFF;border-radius:9px;padding:10px 22px;font-size:13.5px;font-weight:600;cursor:pointer'
+        : 'border:1px solid #E7E2D9;background:#FAF8F3;color:#B5AF9F;border-radius:9px;padding:10px 22px;font-size:13.5px;font-weight:600;cursor:default',
+
+      // guide refs
+      guideRef: this.guideRef, gsvgRef: this.gsvgRef, glineRef: this.glineRef, glabelRef: this.glabelRef,
+    };
+  }
+}
+</script>
+</body>
+</html>

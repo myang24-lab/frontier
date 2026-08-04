@@ -1,0 +1,12 @@
+{
+  "name": "local-ai-os-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Frontier-tier relay: holds the Claude API key and the token ledger. Never runs on a student machine.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0"
+  }
+}
