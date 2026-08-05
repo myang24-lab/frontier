@@ -95,6 +95,27 @@ Three facts worth designing around:
   counterintuitive and the single most interesting thing to teach if there's room
   for one piece of "how this works" education.
 
+## What the screen actually is
+
+It's a **conversation interface** — the student types a message, sends it, and a
+reply streams back. Structurally it sits inside the app's existing shell: a 250px
+left sidebar for navigation and session list, with Coding Spaces filling the main
+panel to the right (the same way the app's existing Chat, Quests and Marketplace
+panels do).
+
+The main panel needs, at minimum:
+
+- a **transcript** of the conversation so far
+- a **composer** at the bottom where the student types
+- attached to that composer: a **model picker** (Opus 5 / Fable 5), an **effort
+  dial** (five levels), and a **live price** that updates as either changes
+- the student's **token balance**, visible without hunting for it
+
+How those pieces are arranged, weighted and grouped is yours to decide — that
+list is what must exist, not a layout. The existing app puts a persistent token
+pill at the top right and keeps its chat composer in a rounded card at the bottom
+of a centred column; you can follow that, extend it, or argue for something else.
+
 ## Scope — the full Coding Spaces experience
 
 Design and build all of these states:
@@ -162,15 +183,24 @@ is the action colour. Keep both roles.
 
 ## Deliverable
 
-**One self-contained HTML file** with inline CSS and whatever vanilla JavaScript
-you need to demonstrate the states. No build step, no external dependencies
-except the Google Fonts link. It should open in a browser and be explorable —
-buttons that move between states, a working effort dial, a simulated stream so
-the thinking and answering states can actually be seen in motion rather than
-described.
+**A brand new, self-contained HTML file.** Not an edit of the attached app file —
+write it from scratch, standing alone, opening cleanly in a browser on its own.
 
-I'm going to port this into the app myself, so favour clear structure and real
-values over cleverness. Don't wire it to any API — fake the data locally.
+Inline CSS, and whatever vanilla JavaScript you need to demonstrate the states.
+No build step, no external dependencies except the Google Fonts link. It should
+be explorable: buttons that move between states, a working effort dial, and a
+simulated stream so the thinking and answering states can be seen in motion
+rather than described.
+
+**About the attached `Local AI OS.dc.html`** — it is *reference only*, for the
+visual language: real colours in context, type scale, spacing, motion, and how
+the existing panels are structured. Read it to match the feel.
+
+Do **not** copy its markup conventions. That file uses a custom templating syntax
+(`<sc-if>`, `<sc-for>`, `{{ handlebars }}`) belonging to a runtime that won't
+exist in what you write. Give me plain, ordinary HTML. I'll translate it into the
+app's structure myself, so favour clear markup and real values over cleverness,
+and don't wire anything to an API — fake the data locally.
 
 Alongside the file, give me a short rationale covering:
 
