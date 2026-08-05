@@ -121,20 +121,50 @@ of a centred column; you can follow that, extend it, or argue for something else
 Design and build all of these states:
 
 1. **Locked** — before the student has unlocked the tier
-2. **First arrival** — unlocked, empty, with a balance and no conversation yet
-3. **Composing** — the model picker, the effort dial, and a live price that moves
+
+2. **The unlock moment** — an introduction the student sees *once*, immediately
+   after unlocking, before they ever reach the conversation screen. This is the
+   only guaranteed moment where they're paying full attention, so it carries the
+   teaching. It should open with a genuine sense of arrival — the app already
+   celebrates unlocks with particle bursts, glow pulses and a rising toast, and
+   this is the biggest unlock in the product — then explain four things:
+
+   - **What a frontier model is**, against what they've been using. They've spent
+     the whole app running a 0.5B model on their own laptop. These are vastly
+     larger models in a data centre. Concretely: their local model can't reliably
+     write a working program or reason through a multi-step problem; these can.
+   - **The tradeoff.** It isn't free, it isn't private to their machine, and it
+     isn't instant. Those are the costs of the capability.
+   - **What tokens actually buy.** The currency they've been earning stops being
+     a score and becomes money. ~7 tokens for a typical Opus 5 message; 25 for a
+     max-effort Fable 5 one; they have about 70.
+   - **The effort dial**, which is the one genuinely new control.
+
+   Whether that's one screen, a short sequence of beats, or something animated
+   and progressive is yours to decide. It must not be a wall of text, and it must
+   be skippable for a student who's seen it — but it should be worth *not*
+   skipping. There's precedent in the app: the marketplace makes students scroll
+   a README and pass a three-question quiz before unlocking sub-agents, so a
+   short comprehension check at the end would sit naturally here. Include one if
+   you think it earns its place; say so if you think it doesn't.
+
+   End it with a clear way into the conversation screen.
+
+3. **First arrival** — the conversation screen, unlocked, empty, with a balance
+   and nothing sent yet
+4. **Composing** — the model picker, the effort dial, and a live price that moves
    as the dial moves (the price is fetched free before sending, so the number can
    update in real time — this interaction *is* the lesson)
-4. **Thinking** — the 25–37 second problem above
-5. **Answering** — reasoning done, answer streaming in
-6. **Complete** — the receipt: what was charged, what was refunded, new balance,
+5. **Thinking** — the 25–37 second problem above
+6. **Answering** — reasoning done, answer streaming in
+7. **Complete** — the receipt: what was charged, what was refunded, new balance,
    and how much of what they paid for was invisible reasoning
-7. **Out of tokens** — must never be a dead end; the student falls back to their
+8. **Out of tokens** — must never be a dead end; the student falls back to their
    local model, clearly labelled, and keeps working
-8. **Stopped** — the student pressed stop mid-generation
-9. **Declined** — the model's safety checks refused; the student is not charged
+9. **Stopped** — the student pressed stop mid-generation
+10. **Declined** — the model's safety checks refused; the student is not charged
 
-Exact copy for states 7–9 is in the attached brief. Use it, or improve on it and
+Exact copy for states 8–10 is in the attached brief. Use it, or improve on it and
 tell me what you changed.
 
 Two things the copy must not get wrong, because both destroy trust:
