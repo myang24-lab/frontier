@@ -33,6 +33,13 @@ Three things it has to teach, in order of importance:
 teach, without making students anxious about experimenting. A student who is
 afraid to press send has learned the wrong lesson.
 
+**The screen has a front door.** Immediately after unlocking, and before reaching
+the conversation itself, the student sees a one-time introduction explaining what
+a frontier model is, what the tradeoff is, and what their tokens now buy. That
+moment carries most of the teaching — it's the only point where full attention is
+guaranteed — and everything described below reinforces it rather than establishes
+it. Nothing on the conversation screen has to explain the concept from scratch.
+
 ---
 
 ## 2. The numbers that should shape the design
