@@ -116,6 +116,17 @@ list is what must exist, not a layout. The existing app puts a persistent token
 pill at the top right and keeps its chat composer in a rounded card at the bottom
 of a centred column; you can follow that, extend it, or argue for something else.
 
+**Target size: a laptop browser, roughly 1280–1600px wide.** The existing app is
+built around a fixed 250px sidebar and doesn't attempt a narrow layout, so don't
+spend effort on tablet or phone breakpoints — use the horizontal space with
+confidence. Light theme only; the app has no dark mode.
+
+**One open question I'd like you to answer rather than assume:** should a
+student's frontier conversations appear in the same left sidebar list as their
+local-model chats, or in a separate list of their own? It's entangled with
+keeping the two tiers distinguishable, so decide it as part of that and tell me
+what you chose.
+
 ## Scope — the full Coding Spaces experience
 
 Design and build all of these states:
