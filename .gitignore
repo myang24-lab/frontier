@@ -10,3 +10,4 @@ node_modules/
 *.sqlite-journal
 
 .DS_Store
+.DS_Store

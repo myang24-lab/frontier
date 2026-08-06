@@ -53,12 +53,17 @@ waits half a minute before seeing a single word of the answer.**
 |---|---|---:|---:|---:|
 | Opus 5 | low | 4.1s | 4.3s | 22.1s |
 | Opus 5 | medium | 4.7s | **9.3s** | 32.6s |
+| Opus 5 | high | 4.5s | **14.3s** | 43.3s |
+| Opus 5 | xhigh | 4.6s | **18.5s** | 44.4s |
 | Opus 5 | max | 5.0s | **25.2s** | 46.8s |
 | Fable 5 | low | 3.9s | 3.9s | 16.6s |
 | Fable 5 | medium | 5.8s | 6.1s | 17.3s |
+| Fable 5 | high | 5.9s | 6.2s | 19.3s |
+| Fable 5 | xhigh | 6.2s | 6.7s | 21.3s |
 | Fable 5 | max | 6.4s | **37.5s** | 55.9s |
 
-*Medians across 12 varied student prompts. Individual messages ran longer.*
+*Medians across 12 varied student prompts per cell, 120 calls in total.
+Individual messages ran longer.*
 
 The gap between column 3 and column 4 is **the model thinking**. The backend
 streams that reasoning live as a summary, so the screen is never actually blank
@@ -77,10 +82,20 @@ At the calibrated rate of one token = $0.0083:
 |---|---|---:|---:|
 | Opus 5 | low | **4 tokens** | $0.033 |
 | Opus 5 | medium | **7 tokens** | $0.051 |
+| Opus 5 | high | **9 tokens** | $0.070 |
+| Opus 5 | xhigh | **9 tokens** | $0.070 |
 | Opus 5 | max | **10 tokens** | $0.077 |
 | Fable 5 | low | **6 tokens** | $0.048 |
 | Fable 5 | medium | **6 tokens** | $0.050 |
+| Fable 5 | high | **7 tokens** | $0.056 |
+| Fable 5 | xhigh | **8 tokens** | $0.065 |
 | Fable 5 | max | **25 tokens** | $0.200 |
+
+**On Opus 5, `high` and `xhigh` cost the same** — $0.0703 against $0.0701, close
+enough to be the same number — **but xhigh takes 4 seconds longer to say
+anything** (18.5s vs 14.3s). Paying nothing extra to wait longer is a bad trade,
+so `high` is the better default there. The dial will show two bars of equal
+height at those stops; that's the truth, not a rendering fault.
 
 A student arrives at this screen with roughly **60–80 tokens** earned on the
 local track. So: about **ten** medium Opus 5 messages, or **two** max-effort
