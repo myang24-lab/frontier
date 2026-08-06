@@ -26,7 +26,7 @@ Do them in order. Each ends in something you can verify yourself.
 > - Hard rule inherited from the project: **no mock fallbacks in the inference path.**
 >   Failures state exactly what broke and how to fix it.
 >
-> Relay lives in a new `relay/` directory, separate from `server/`. Node, using the official
+> Relay lives in a new `frontier/relay/` directory, separate from `server/`. Node, using the official
 > `@anthropic-ai/sdk`. Do not modify `server/agent.py`, the pty terminal, or the Ollama path —
 > the local tier must keep working with zero network dependency.
 
@@ -34,7 +34,7 @@ Do them in order. Each ends in something you can verify yourself.
 
 ## Step 1 — Relay skeleton
 
-Create `relay/` as a standalone Node service: `package.json`, an HTTP server on a
+Create `frontier/relay/` as a standalone Node service: `package.json`, an HTTP server on a
 configurable port, `GET /health`, env-var config loading (`ANTHROPIC_API_KEY`, `PORT`),
 and a `.env.example`. Install `@anthropic-ai/sdk`. No Claude calls yet.
 

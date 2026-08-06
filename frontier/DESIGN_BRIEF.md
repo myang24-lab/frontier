@@ -434,7 +434,7 @@ Be aware of these — designing around them costs nothing, discovering them late
   conversation with caching.
 - **Stop behaviour**: `npm run check:cancel` — max-effort message aborted at 8
   seconds.
-- **Exchange rate**: derived in `relay/ledger.js`, with the full derivation in
+- **Exchange rate**: derived in `frontier/relay/ledger.js`, with the full derivation in
   the comment there.
 
 Re-run any of these to reproduce or update the figures.

@@ -2,7 +2,7 @@
 
 Copy everything below the line. Attach these two files:
 
-- `FRONTIER_DESIGN_BRIEF.md` — the measured facts, contracts and failure copy
+- `frontier/DESIGN_BRIEF.md` — the measured facts, contracts and failure copy
 - `Local AI OS.dc.html` — the existing app, for the visual language
 
 ---
