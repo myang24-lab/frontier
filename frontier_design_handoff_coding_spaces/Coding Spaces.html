@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coding Spaces — Local AI OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+/* ── base ─────────────────────────────────────────────── */
+:root{
+  --paper:#FAF9F5; --surface:#FFFFFF; --sidebar:#F4F1EA;
+  --fill1:#FAF8F3; --fill2:#F2EFE8; --fill3:#EFEBE2; --fill4:#ECE8DE; --fill5:#E7E2D6;
+  --border:#E7E2D9; --ink:#26241E;
+  --mut1:#6E6A60; --mut2:#8A8578; --mut3:#A9A492; --mut4:#B5AF9F; --mut5:#C4BFB2;
+  --accent:#C15F3C; --accent-h:#A24E30;
+  --gold:#C79014; --gold-deep:#8A6A0E; --gold-light:#E3B23C;
+  --error:#C0442A; --success:#7BA05B;
+  --dark:#1E1C18; --dark2:#2A2722; --on-dark:#D8D3C8;
+  --serif:'Newsreader',Georgia,serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}a:hover{color:var(--accent-h)}
+button,input,textarea{font:inherit;color:inherit}
+input:focus,textarea:focus,button:focus{outline:none}
+::selection{background:rgba(193,95,60,.18)}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+@keyframes pillBounce{0%{transform:scale(1)}40%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes glowPulse{0%{box-shadow:0 0 0 0 rgba(199,144,20,.5)}100%{box-shadow:0 0 26px 8px rgba(199,144,20,0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes modalIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes backdropIn{from{opacity:0}to{opacity:1}}
+@keyframes shimmerBurst{from{transform:translate(-50%,-50%) scale(.2);opacity:.9}to{transform:translate(-50%,-50%) scale(3);opacity:0}}
+@keyframes particleFly{to{transform:translate(var(--dx),var(--dy)) scale(.15);opacity:0}}
+@keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* ── shell ────────────────────────────────────────────── */
+.app{display:flex;height:100vh;overflow:hidden}
+.sb{width:250px;flex:none;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:18px 12px 14px}
+.sb-brand{font-size:11px;letter-spacing:.2em;font-weight:600;color:var(--mut3);padding:0 10px;margin-bottom:16px}
+.sb-new{display:flex;align-items:center;gap:9px;width:100%;border:1px solid #E0DBD0;background:var(--surface);border-radius:9px;padding:9px 12px;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--ink)}
+.sb-new:hover{border-color:var(--accent)}
+.sb-new .plus{font-size:16px;line-height:1;color:var(--accent);font-weight:400}
+.sb-head{font-size:10.5px;letter-spacing:.14em;font-weight:600;color:var(--mut3);padding:0 10px;margin:16px 0 6px;display:flex;align-items:center;gap:6px}
+.sb-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13.5px;color:var(--mut1);cursor:pointer;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sb-item:hover{background:var(--fill4)}
+.sb-item.on{background:var(--fill4);color:var(--ink);font-weight:600}
+.sb-item .grow{flex:1;overflow:hidden;text-overflow:ellipsis}
+.sb-empty{padding:6px 10px;font-size:12.5px;color:var(--mut4);font-style:italic}
+.sb-rule{height:1px;background:var(--border);margin:16px 6px}
+.sb-foot{border-top:1px solid var(--border);padding:12px 10px 0;display:flex;align-items:center;gap:8px;margin-top:auto}
+.dot-live{width:9px;height:9px;border-radius:50%;background:var(--success);box-shadow:0 0 6px rgba(123,160,91,.55);flex:none}
+.fdot{width:7px;height:7px;flex:none;background:var(--dark);transform:rotate(45deg);border-radius:1.5px}
+.lockg{position:relative;width:10px;height:8px;background:var(--mut4);border-radius:2px;display:inline-block;margin-top:3px;flex:none}
+.lockg::before{content:"";position:absolute;left:2px;top:-5px;width:6px;height:6px;border:1.5px solid var(--mut4);border-bottom:none;border-radius:5px 5px 0 0}
+
+/* ── main panel ───────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+.panel-head{display:flex;align-items:center;gap:12px;padding:14px 24px 12px;border-bottom:1px solid rgba(231,226,217,.7)}
+.panel-title{font-family:var(--serif);font-weight:500;font-size:18px}
+.chip-frontier{display:inline-flex;align-items:center;gap:7px;background:var(--dark);color:var(--on-dark);border-radius:999px;padding:4px 12px;font-size:11px;font-weight:600;letter-spacing:.04em}
+.chip-frontier .d{width:6px;height:6px;background:var(--on-dark);transform:rotate(45deg);border-radius:1px}
+.pill{position:fixed;top:16px;right:20px;z-index:250;display:flex;align-items:center;gap:8px;padding:7px 15px;border:1px solid var(--border);border-radius:999px;background:var(--surface);font-size:13px;font-weight:600}
+.pill .gdot{width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px rgba(199,144,20,.6)}
+.pill .num{color:var(--gold-deep);font-variant-numeric:tabular-nums}
+.pill .lbl{color:#B0AA9B;font-weight:500}
+
+/* ── transcript ───────────────────────────────────────── */
+.scroll{flex:1;overflow-y:auto;padding:24px 24px 12px}
+.col{max-width:680px;margin:0 auto}
+.hero{padding-top:14vh;text-align:center;animation:fadeUp .4s ease both}
+.hero h2{font-family:var(--serif);font-weight:500;font-size:28px;margin:0 0 10px}
+.hero p{font-size:14px;color:var(--mut2);margin:0 0 6px;line-height:1.6}
+.hero .try{display:inline-flex;flex-direction:column;gap:8px;margin-top:26px}
+.hero .try button{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:10px 16px;font-size:13.5px;color:var(--mut1);cursor:pointer;text-align:left}
+.hero .try button:hover{border-color:var(--accent);color:var(--accent-h)}
+.t-user{display:flex;justify-content:flex-end;margin:18px 0}
+.t-user .bub{max-width:72%;background:var(--fill3);border-radius:14px 14px 4px 14px;padding:10px 15px;font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+.t-ai{margin:18px 0;animation:fadeUp .3s ease both}
+.badge-f{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--on-dark);background:var(--dark);border-radius:6px;padding:3px 10px;letter-spacing:.03em}
+.badge-f .d{width:5px;height:5px;background:var(--on-dark);transform:rotate(45deg);border-radius:1px}
+.badge-l{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--accent);background:rgba(193,95,60,.08);border-radius:6px;padding:3px 9px}
+.t-meta{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:11.5px;color:var(--mut3)}
+.t-meta .elapsed{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--mut2)}
+.hold-note{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut2);background:var(--fill1);border:1px solid var(--fill3);border-radius:9px;padding:8px 13px;animation:breathe 2.2s ease-in-out infinite}
+.hold-note b{color:var(--gold-deep);font-weight:600;font-family:var(--mono)}
+
+/* reasoning — the main event while thinking, then yields */
+.reason{border-left:2px solid var(--fill5);padding:2px 0 2px 16px;margin:4px 0 6px;transition:opacity .4s ease}
+.reason .rlabel{font-size:11px;letter-spacing:.14em;font-weight:600;color:var(--mut3);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.reason .rlabel .tick{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:breathe 1.4s ease-in-out infinite}
+.reason .rbody{font-size:14px;line-height:1.75;color:var(--mut1);white-space:pre-wrap;max-height:1200px;transition:max-height .6s cubic-bezier(.22,1,.36,1)}
+.reason.done{opacity:.9}
+.reason.done .rbody{max-height:0;overflow:hidden}
+.reason.done.open .rbody{max-height:1200px;padding-top:8px}
+.rtoggle{border:none;background:none;padding:0;font-size:12px;color:var(--mut3);cursor:pointer;font-weight:600}
+.rtoggle:hover{color:var(--accent)}
+.ans{font-size:14.5px;line-height:1.68;margin-top:12px}
+.ans p{margin:0 0 12px}
+.ans pre{background:var(--dark);color:var(--on-dark);border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow-x:auto;margin:0 0 12px}
+.ans code.inl{font-family:var(--mono);font-size:13px;background:var(--fill2);border-radius:4px;padding:1px 5px}
+.caret{display:inline-block;width:8px;height:15px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1.05s steps(1) infinite}
+
+/* receipt */
+.receipt{margin-top:14px;border:1px solid var(--border);background:var(--fill1);border-radius:12px;padding:13px 16px;font-size:12.5px;color:var(--mut1);animation:fadeUp .35s ease both}
+.receipt .row1{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;font-family:var(--mono);font-size:12.5px}
+.receipt .row1 b{color:var(--gold-deep);font-weight:600}
+.receipt .usd{color:var(--mut4)}
+.split{display:flex;align-items:center;gap:10px;margin-top:11px}
+.splitbar{flex:1;max-width:260px;height:6px;border-radius:99px;overflow:hidden;display:flex;background:var(--fill3)}
+.splitbar .think{background:var(--mut5);height:100%}
+.splitbar .ans-b{background:var(--gold-light);height:100%}
+.cache-note{margin-top:10px;padding-top:10px;border-top:1px solid var(--fill3);color:var(--mut2);line-height:1.55}
+.cache-note b{color:var(--ink);font-weight:600}
+
+/* state cards (402 / declined / stopped) */
+.scard{margin:18px 0;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:16px 18px;animation:fadeUp .3s ease both;max-width:560px}
+.scard h4{font-family:var(--serif);font-weight:600;font-size:16.5px;margin:0 0 6px}
+.scard p{font-size:13.5px;color:var(--mut1);line-height:1.6;margin:0}
+.scard p b{color:var(--ink)}
+.scard .acts{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.btn{border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--accent-h)}
+.btn-ghost{border:1px solid var(--border);background:var(--fill1);color:var(--mut1);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── composer ─────────────────────────────────────────── */
+.comp-wrap{padding:0 24px 20px}
+.comp{max-width:680px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;box-shadow:0 2px 10px rgba(38,36,30,.04)}
+.comp textarea{width:100%;border:none;background:none;resize:none;font-size:14.5px;line-height:1.5;padding:2px;min-height:22px;max-height:120px}
+.comp-row{display:flex;align-items:flex-end;gap:16px;margin-top:8px;padding-top:10px;border-top:1px solid var(--fill2)}
+.seg{display:flex;background:var(--fill2);border-radius:9px;padding:3px;gap:2px;flex:none}
+.seg button{border:none;background:none;border-radius:7px;padding:6px 13px;font-size:12.5px;font-weight:600;color:var(--mut2);cursor:pointer;white-space:nowrap;flex:none}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(38,36,30,.08)}
+.dial{display:flex;flex-direction:column;gap:3px;flex:none}
+.dial-cap{font-size:10.5px;letter-spacing:.1em;font-weight:600;color:var(--mut3)}
+.dial-stops{display:flex;align-items:flex-end;gap:5px;height:34px}
+.stop{width:26px;display:flex;flex-direction:column;align-items:center;gap:0;border:none;background:none;padding:0;cursor:pointer;height:100%;justify-content:flex-end}
+.stop .bar{width:100%;border-radius:3px 3px 0 0;background:var(--fill5);transition:height .25s cubic-bezier(.22,1,.36,1),background .2s}
+.stop:hover .bar{background:var(--mut5)}
+.stop.on .bar{background:var(--gold)}
+.dial-lbls{display:flex;gap:5px}
+.dial-lbls span{width:26px;text-align:center;font-size:9.5px;color:var(--mut4);font-weight:600}
+.dial-lbls span.on{color:var(--gold-deep)}
+.price{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:2px;align-items:flex-end;min-width:0}
+.price .up{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--gold-deep);font-variant-numeric:tabular-nums;transition:transform .15s}
+.price .up.bump{animation:pillBounce .35s ease}
+.price .sub{font-size:11px;color:var(--mut3)}
+.price .warn{font-size:11px;color:var(--gold-deep);max-width:200px;text-align:right;line-height:1.4;flex-shrink:1}
+.send{width:36px;height:36px;flex:none;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.send:hover{background:var(--accent-h)}
+.send:disabled{background:var(--fill5);color:var(--mut4);cursor:default}
+.stopbtn{border:1px solid var(--border);background:var(--surface);color:var(--mut1);border-radius:10px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;margin-left:auto}
+.stopbtn:hover{border-color:var(--error);color:var(--error)}
+.stopbtn .sq{display:inline-block;width:9px;height:9px;background:currentColor;border-radius:2px;margin-right:8px;vertical-align:-1px}
+.comp-foot{max-width:680px;margin:8px auto 0;display:flex;justify-content:center;font-size:11.5px;color:var(--mut4)}
+
+/* ── locked view ──────────────────────────────────────── */
+.locked{flex:1;display:flex;align-items:center;justify-content:center}
+.locked-inner{text-align:center;max-width:440px;padding:0 24px;animation:fadeUp .4s ease both}
+.locked-inner .biglock{position:relative;width:26px;height:20px;background:var(--mut4);border-radius:4px;display:inline-block;margin-bottom:22px}
+.locked-inner .biglock::before{content:"";position:absolute;left:4.5px;top:-13px;width:17px;height:16px;border:3.5px solid var(--mut4);border-bottom:none;border-radius:12px 12px 0 0}
+.locked-inner h2{font-family:var(--serif);font-weight:500;font-size:26px;margin:0 0 10px}
+.locked-inner p{font-size:14px;color:var(--mut2);line-height:1.65;margin:0}
+
+/* ── intro overlay ────────────────────────────────────── */
+.intro{position:fixed;inset:0;background:var(--paper);z-index:300;display:none;flex-direction:column;animation:backdropIn .4s ease both}
+.intro.show{display:flex}
+.intro-top{display:flex;justify-content:space-between;align-items:center;padding:20px 28px}
+.intro-brand{font-size:11px;letter-spacing:.22em;font-weight:600;color:var(--mut3)}
+.skip{border:none;background:none;font-size:13px;color:var(--mut3);cursor:pointer;font-weight:600}
+.skip:hover{color:var(--accent)}
+.intro-body{flex:1;display:flex;align-items:center;justify-content:center;padding:0 24px}
+.beat{max-width:620px;width:100%;animation:modalIn .4s cubic-bezier(.22,1,.36,1) both}
+.beat .kicker{font-size:11px;letter-spacing:.22em;font-weight:600;color:var(--accent);margin-bottom:14px}
+.beat h1{font-family:var(--serif);font-weight:500;font-size:38px;line-height:1.15;margin:0 0 14px;letter-spacing:-.01em}
+.beat .lede{font-size:15.5px;color:var(--mut1);line-height:1.7;margin:0 0 8px}
+.beat .lede b{color:var(--ink)}
+.scale-viz{display:flex;align-items:flex-end;gap:48px;margin:34px 0 10px}
+.scale-viz .item{display:flex;flex-direction:column;align-items:center;gap:12px}
+.scale-viz .c-small{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.scale-viz .c-big{width:130px;height:130px;border-radius:50%;background:var(--dark)}
+.scale-viz .cap{font-family:var(--mono);font-size:11.5px;color:var(--mut2);text-align:center;line-height:1.5}
+.scale-note{font-size:12px;color:var(--mut4);font-style:italic}
+.trade{display:flex;flex-direction:column;gap:0;margin-top:28px;border-top:1px solid var(--border)}
+.trade .row{display:flex;gap:18px;padding:16px 2px;border-bottom:1px solid var(--border);align-items:baseline}
+.trade .row .k{font-family:var(--serif);font-size:18px;font-weight:600;width:150px;flex:none}
+.trade .row .v{font-size:14px;color:var(--mut1);line-height:1.6}
+.coins{display:flex;flex-direction:column;gap:18px;margin-top:30px}
+.coins .crow{display:flex;align-items:center;gap:14px}
+.coins .cdots{display:flex;gap:5px}
+.coins .cdot{width:13px;height:13px;border-radius:50%;background:var(--gold-light);border:1.5px solid var(--gold)}
+.coins .cdot.big{width:26px;height:26px}
+.coins .clbl{font-size:13.5px;color:var(--mut1)}
+.coins .clbl b{color:var(--ink)}
+.mini-dial-wrap{margin-top:26px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px;display:flex;align-items:flex-end;gap:22px}
+.check{margin-top:24px;display:flex;flex-direction:column;gap:8px}
+.check .opt{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:12px 15px;font-size:14px;text-align:left;cursor:pointer;line-height:1.5}
+.check .opt:hover{border-color:var(--mut5)}
+.check .opt.right{border-color:var(--success);background:rgba(123,160,91,.07)}
+.check .opt.wrong{border-color:rgba(192,68,42,.5);background:rgba(192,68,42,.05)}
+.check-fb{font-size:13px;line-height:1.55;min-height:20px;margin-top:6px;color:var(--mut1)}
+.intro-foot{display:flex;align-items:center;justify-content:space-between;padding:24px 28px 30px;max-width:676px;margin:0 auto;width:100%}
+.dots{display:flex;gap:7px}
+.dots span{width:7px;height:7px;border-radius:50%;background:var(--fill5);transition:background .25s}
+.dots span.on{background:var(--accent)}
+.nextbtn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 26px;font-size:14.5px;font-weight:600;cursor:pointer}
+.nextbtn:hover{background:var(--accent-h)}
+.nextbtn:disabled{background:var(--fill5);color:var(--mut4);cursor:default}
+.backbtn{border:none;background:none;color:var(--mut3);font-size:13.5px;font-weight:600;cursor:pointer}
+.backbtn:hover{color:var(--mut1)}
+
+/* toast */
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:350;animation:fadeUp .3s ease both;background:var(--dark);color:var(--paper);border-radius:999px;padding:10px 22px;font-size:13.5px;font-weight:600;box-shadow:0 10px 30px rgba(38,36,30,.3);display:flex;align-items:center;gap:9px}
+.toast .td{width:8px;height:8px;border-radius:50%;background:var(--gold-light)}
+
+/* demo strip */
+.demo{position:fixed;left:12px;bottom:12px;z-index:400;background:var(--dark);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;max-width:calc(100vw - 300px);box-shadow:0 10px 30px rgba(38,36,30,.25)}
+.demo .dlbl{font-family:var(--mono);font-size:10px;color:#7A756A;letter-spacing:.1em;margin-right:4px}
+.demo button{border:none;background:none;color:var(--on-dark);font-family:var(--mono);font-size:10.5px;padding:4px 7px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.demo button:hover{background:var(--dark2)}
+.demo .note{font-family:var(--mono);font-size:9.5px;color:#7A756A;margin-left:4px}
+</style>
+</head>
+<body>
+
+<div class="pill" id="pill">
+  <span class="gdot"></span><span class="num" id="pillNum">72</span><span class="lbl">tokens</span>
+</div>
+
+<div class="app">
+  <!-- ══ sidebar ══ -->
+  <aside class="sb">
+    <div class="sb-brand">LOCAL AI OS</div>
+    <button class="sb-new" onclick="newConversation()"><span class="plus">+</span> New session</button>
+
+    <div class="sb-head">ON YOUR LAPTOP</div>
+    <div class="sb-item"><span class="grow">Trig identities help</span></div>
+    <div class="sb-item"><span class="grow">College essay outline</span></div>
+
+    <div class="sb-head" style="margin-top:20px"><span class="fdot"></span> CODING SPACES</div>
+    <div id="frontierList"></div>
+
+    <div class="sb-rule"></div>
+    <div class="sb-item" onclick="toast('Quests — not part of this prototype')"><span class="grow">Quests</span></div>
+    <div class="sb-item" onclick="toast('Marketplace — not part of this prototype')"><span class="grow">Marketplace</span></div>
+    <div class="sb-item on" id="navCS"><span class="grow">Coding Spaces</span><span class="lockg" id="csLock"></span></div>
+
+    <div class="sb-foot">
+      <span class="dot-live"></span>
+      <div>
+        <div style="font-size:12.5px;font-weight:600">Qwen 2.5 · 0.5B</div>
+        <div style="font-size:11px;color:var(--mut3)">running locally · free</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══ main ══ -->
+  <main class="main" id="main"></main>
+</div>
+
+<!-- ══ unlock intro ══ -->
+<div class="intro" id="intro">
+  <div class="intro-top">
+    <div class="intro-brand">LOCAL AI OS · CODING SPACES</div>
+    <button class="skip" onclick="finishIntro()">Skip — I've seen this</button>
+  </div>
+  <div class="intro-body"><div class="beat" id="beatBox"></div></div>
+  <div class="intro-foot">
+    <button class="backbtn" id="backBtn" onclick="beatBack()">Back</button>
+    <div class="dots" id="dots"></div>
+    <button class="nextbtn" id="nextBtn" onclick="beatNext()">Next</button>
+  </div>
+</div>
+
+<div class="demo">
+  <span class="dlbl">STATES</span>
+  <button onclick="demoLocked()">locked</button>
+  <button onclick="demoUnlock()">unlock</button>
+  <button onclick="demoEmpty()">first arrival</button>
+  <button onclick="demoThinking()">thinking</button>
+  <button onclick="demoAnswering()">answering</button>
+  <button onclick="demoReceipt()">receipt</button>
+  <button onclick="demoTurn2()">turn 2 (cached)</button>
+  <button onclick="demoBroke()">out of tokens</button>
+  <button onclick="demoStopped()">stopped</button>
+  <button onclick="demoDeclined()">declined</button>
+  <span class="note">streams play 4× faster than measured</span>
+</div>
+
+<script>
+/* ════════ measured data (from FRONTIER_DESIGN_BRIEF.md) ════════
+   firstAny / firstWord / complete are median seconds.
+   "up" is the pre-send ceiling (what /estimate returns as maxTokenCost);
+   "typ" is what messages typically end up charging.                 */
+const EFFORTS = ['low','medium','high','xhigh','max'];
+const EFFORT_LBL = ['Low','Med','High','X-hi','Max'];
+const MODELS = {
+  opus:  { name:'Opus 5',  full:'Claude Opus 5',
+           firstAny:[4.1,4.7,5.0,5.0,5.0], firstWord:[4.3,9.3,15,20,25.2], complete:[22.1,32.6,38,42,46.8],
+           up:[8,13,15,17,20], typ:[4,7,8,9,10] },
+  fable: { name:'Fable 5', full:'Claude Fable 5',
+           firstAny:[3.9,5.8,6.4,6.4,6.4], firstWord:[3.9,6.1,15,25,37.5], complete:[16.6,17.3,30,44,55.9],
+           up:[10,10,15,24,38], typ:[6,6,9,14,25] },
+};
+const THINK_SHARE = [0.12,0.25,0.38,0.50,0.62];
+const USD_PER_TOKEN = 0.0083;
+const SPEED = 4; // demo time compression
+
+const SAMPLE_PROMPT = "My sudoku solver returns wrong answers on hard puzzles but passes easy ones. Here's my backtracking code — isBoxOk uses (row%3)*3 to find the box corner. Can you find the bug and explain why easy puzzles still pass?";
+
+const REASONING = "Reading through the solver first. The backtracking structure looks standard — find an empty cell, try candidates, recurse, undo on failure. Wrong answers on hard puzzles usually mean a constraint is leaking rather than the search itself failing, so checking candidate validation next. Row and column checks look fine. The box check computes its corner with (row % 3) * 3 — that's the suspect: it should divide, not take the remainder. Verifying with a concrete case: for row 4, (4 % 3) * 3 gives 3, and floor(4 / 3) * 3 also gives 3, so they agree there. Need a row where they differ. Row 7: remainder gives 1 * 3 = 3, floor gives 2 * 3 = 6. Different — so cells in the bottom band are validated against the middle band's box. That also explains why easy puzzles pass: they're mostly solved by direct placement before the search does deep work in those rows, so the leaked constraint rarely gets exercised. Composing the fix now, plus a minimal test that would have caught this.";
+
+const ANSWER = "Found it. The bug is in how `isBoxOk` locates the 3×3 box corner.\n\n`(row % 3) * 3` gives the remainder, but the corner needs the quotient:\n\n```\nconst r0 = Math.floor(row / 3) * 3;\nconst c0 = Math.floor(col / 3) * 3;\n```\n\nWith the remainder version, rows 0–2 and columns 0–2 happen to produce the right corner, so the top-left region of the board is always checked correctly. But row 7 maps to corner 3 instead of 6 — every cell in the bottom band gets validated against the wrong box — the middle band's. Duplicates in those boxes slip through.\n\nWhy easy puzzles still pass: they're mostly solvable by forced placements, so your search rarely backtracks deep into the bottom rows where the leak lives. Hard puzzles force exploration there, and the broken constraint lets an invalid branch \"succeed\" first.\n\nA test that would have caught it:\n\n```\n// duplicate 5s in the bottom-left box, different rows/cols\nboard[6][0] = 5; board[8][2] = 5;\nassert(!isBoxOk(board, 8, 2, 5));\n```\n\nRun your suite against puzzles rated hard or above — that's where backtracking depth actually exercises every constraint.";
+
+const LOCAL_ANSWER = "It sounds like there might be an issue with your backtracking logic. Make sure your loops go from 0 to 8 and that you check rows, columns and boxes before placing a number. Also check that you return true when the board is full. Backtracking bugs can be tricky to find — try printing the board at each step!";
+
+/* ════════ state ════════ */
+const S = {
+  unlocked:false, introDone:false,
+  balance:72, held:0,
+  model:'opus', effort:2,        // API default effort is "high"
+  turns:[], convTitle:null,
+  phase:'idle',                  // idle | holding | thinking | answering
+  sim:null, timer:null,
+};
+
+/* ════════ helpers ════════ */
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function fmtTime(s){ const m=Math.floor(s/60), ss=Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); }
+function money(t){ return '$'+(t*USD_PER_TOKEN).toFixed(3); }
+function toast(text, ms=2800){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const el=document.createElement('div'); el.className='toast';
+  el.innerHTML='<span class="td"></span>'+esc(text);
+  document.body.appendChild(el); setTimeout(()=>el.remove(), ms);
+}
+function pulsePill(){
+  const el=$('pill'); el.style.animation='none'; void el.offsetWidth;
+  el.style.animation='pillBounce .5s ease, glowPulse .8s ease';
+}
+function setBalance(n){
+  S.balance=n; const el=$('pillNum');
+  const from=parseInt(el.textContent)||0, t0=performance.now(), dur=600;
+  (function tick(now){
+    const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(from+(n-from)*e);
+    if(p<1) requestAnimationFrame(tick);
+  })(t0);
+  pulsePill();
+}
+function burstAt(sel){
+  const el=document.querySelector(sel); if(!el) return;
+  const r=el.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+  const c=document.createElement('div');
+  c.style.cssText=`position:fixed;left:${cx}px;top:${cy}px;z-index:500;pointer-events:none`;
+  const ring=document.createElement('span');
+  ring.style.cssText='position:absolute;left:0;top:0;width:56px;height:56px;border-radius:50%;border:2px solid rgba(199,144,20,.8);transform:translate(-50%,-50%);animation:shimmerBurst .7s ease-out both';
+  c.appendChild(ring);
+  for(let i=0;i<12;i++){
+    const a=(i/12)*Math.PI*2, d=42+Math.random()*36;
+    const p=document.createElement('span');
+    p.style.cssText=`position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:${i%3?'#C79014':'#E3B23C'};--dx:${Math.cos(a)*d}px;--dy:${Math.sin(a)*d}px;animation:particleFly ${0.55+Math.random()*0.35}s ease-out both`;
+    c.appendChild(p);
+  }
+  document.body.appendChild(c); setTimeout(()=>c.remove(),1000);
+}
+
+/* ════════ markdown-lite for answers (code fences, inline code, *em*) ════════ */
+function renderMd(text){
+  const parts = text.split('```');
+  let html='';
+  for(let i=0;i<parts.length;i++){
+    if(i%2===1){ html+='<pre>'+esc(parts[i].replace(/^\n/,''))+'</pre>'; }
+    else{
+      const paras=esc(parts[i]).trim().split(/\n\n+/).filter(Boolean).map(p=>
+        '<p>'+p.replace(/`([^`]+)`/g,'<code class="inl">$1</code>').replace(/\*([^*]+)\*/g,'<em>$1</em>')+'</p>'
+      );
+      html+=paras.join('');
+    }
+  }
+  return html;
+}
+function revealWords(text, frac){
+  const words=text.split(' ');
+  return words.slice(0, Math.max(0, Math.round(words.length*frac))).join(' ');
+}
+
+/* ════════ main panel rendering ════════ */
+function renderMain(){
+  const main=$('main');
+  $('csLock').style.display = S.unlocked ? 'none' : '';
+  if(!S.unlocked){
+    main.innerHTML = `
+      <div class="panel-head"><span class="panel-title">Coding Spaces</span></div>
+      <div class="locked"><div class="locked-inner">
+        <span class="biglock"></span>
+        <h2>Coding Spaces is still locked.</h2>
+        <p>Finish the <b>Run a sub-agent</b> quest to unlock it. It's where your tokens buy time with a frontier model — the biggest ones there are, running in a data centre instead of on your laptop.</p>
+      </div></div>`;
+    renderSidebar();
+    return;
+  }
+  main.innerHTML = `
+    <div class="panel-head">
+      <span class="panel-title">Coding Spaces</span>
+      <span class="chip-frontier"><span class="d"></span>FRONTIER · RUNS IN A DATA CENTRE</span>
+    </div>
+    <div class="scroll" id="scroll"><div class="col" id="transcript"></div></div>
+    <div class="comp-wrap">
+      <div class="comp">
+        <textarea id="draft" rows="1" placeholder="Ask something your local model can't do…" oninput="autosize(this)" onkeydown="draftKey(event)"></textarea>
+        <div class="comp-row" id="compRow"></div>
+      </div>
+      <div class="comp-foot">Priced before you send, free — only what the model actually writes is charged.</div>
+    </div>`;
+  renderComposer(); renderTranscript(); renderSidebar();
+}
+function autosize(t){ t.style.height='auto'; t.style.height=Math.min(120,t.scrollHeight)+'px'; }
+function draftKey(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } }
+
+function renderSidebar(){
+  const el=$('frontierList');
+  if(!S.unlocked){ el.innerHTML='<div class="sb-empty">locked</div>'; return; }
+  el.innerHTML = S.convTitle
+    ? `<div class="sb-item on"><span class="fdot"></span><span class="grow">${esc(S.convTitle)}</span></div>`
+    : '<div class="sb-empty">No conversations yet</div>';
+}
+
+/* ════════ composer ════════ */
+function renderComposer(){
+  const row=$('compRow'); if(!row) return;
+  if(S.phase!=='idle'){
+    const m=MODELS[S.model];
+    row.innerHTML=`
+      <span style="font-size:12px;color:var(--mut3)">${m.name} · ${EFFORT_LBL[S.effort].toLowerCase()} effort · working…</span>
+      <button class="stopbtn" onclick="stopGen()"><span class="sq"></span>Stop — you'll be charged for what's written so far</button>`;
+    return;
+  }
+  const m=MODELS[S.model];
+  const up=m.up[S.effort], typ=m.typ[S.effort];
+  const maxCost=Math.max(...m.up);
+  const bars = EFFORTS.map((e,i)=>{
+    const h=Math.max(5, Math.round(m.up[i]/maxCost*30));
+    return `<button class="stop ${i===S.effort?'on':''}" onclick="setEffort(${i})" title="${EFFORT_LBL[i]} — up to ${m.up[i]} tokens"><span class="bar" style="height:${h}px"></span></button>`;
+  }).join('');
+  const lbls = EFFORT_LBL.map((l,i)=>`<span class="${i===S.effort?'on':''}">${l}</span>`).join('');
+  const expensive = up >= S.balance*0.5;
+  const short = S.balance < typ;
+  row.innerHTML=`
+    <div class="seg">
+      <button class="${S.model==='opus'?'on':''}" onclick="setModel('opus')">Opus 5</button>
+      <button class="${S.model==='fable'?'on':''}" onclick="setModel('fable')">Fable 5</button>
+    </div>
+    <div class="dial">
+      <span class="dial-cap">EFFORT</span>
+      <div class="dial-stops">${bars}</div>
+      <div class="dial-lbls">${lbls}</div>
+    </div>
+    <div class="price">
+      <span class="up" id="priceUp">up to ${up} tokens</span>
+      <span class="sub">usually ~${typ} · unused comes back</span>
+      ${short?`<span class="warn">Not enough for this one — your local model is free below.</span>`
+        : expensive?`<span class="warn">Could use up to ${up} of your ${S.balance} — usually much less.</span>`:''}
+    </div>
+    <button class="send" onclick="send()" title="Send">↑</button>`;
+}
+function bumpPrice(){ const el=$('priceUp'); if(el){ el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); } }
+function setModel(m){ S.model=m; renderComposer(); bumpPrice(); }
+function setEffort(i){ S.effort=i; renderComposer(); bumpPrice(); }
+
+/* ════════ transcript ════════ */
+function renderTranscript(){
+  const t=$('transcript'); if(!t) return;
+  if(S.turns.length===0){
+    t.innerHTML=`
+      <div class="hero">
+        <h2>This is the frontier tier.</h2>
+        <p>Same conversation, vastly bigger model — running in a data centre, paid for with your tokens.</p>
+        <p style="color:var(--mut3)">Ask something your local model couldn't handle.</p>
+        <div class="try">
+          <button onclick="fillDraft()">Try: “Find the bug in my sudoku solver and explain it” →</button>
+        </div>
+      </div>`;
+    return;
+  }
+  t.innerHTML = S.turns.map((tn,idx)=>renderTurn(tn,idx)).join('');
+}
+function fillDraft(){ const d=$('draft'); d.value=SAMPLE_PROMPT; autosize(d); d.focus(); }
+
+function renderTurn(tn, idx){
+  if(tn.role==='user')
+    return `<div class="t-user"><div class="bub">${esc(tn.text)}</div></div>`;
+
+  if(tn.role==='card402'){
+    return `<div class="scard">
+      <h4>You're out of tokens for this one.</h4>
+      <p>This message needs about <b>${tn.needed}</b> and you have <b>${tn.have}</b>. Earn more by using your local model and finishing quests — or send it to Qwen&nbsp;2.5 running on your laptop right now, free.</p>
+      <div class="acts">
+        <button class="btn" onclick="sendToLocal(${idx})">Send to local model instead</button>
+        <button class="btn-ghost" onclick="toast('Quests — not part of this prototype')">See how to earn tokens</button>
+      </div></div>`;
+  }
+  if(tn.role==='declined'){
+    return `<div class="t-ai">
+      <div class="t-meta"><span class="badge-f"><span class="d"></span>${MODELS[tn.model].name}</span></div>
+      <div class="scard" style="margin:0">
+        <h4>This one came back declined.</h4>
+        <p>The model's safety checks stopped this request. <b>You weren't charged.</b> Rephrasing usually helps — or try the local model, which has different limits.</p>
+      </div></div>`;
+  }
+  if(tn.role==='local'){
+    return `<div class="t-ai">
+      <div class="t-meta"><span class="badge-l">◈ Qwen 2.5 · 0.5B — your laptop · free</span></div>
+      <div class="ans">${renderMd(tn.shown)}${tn.streaming?'<span class="caret"></span>':''}</div>
+    </div>`;
+  }
+
+  /* frontier assistant turn */
+  const m=MODELS[tn.model];
+  let meta=`<span class="badge-f"><span class="d"></span>${m.name}</span>
+            <span>${EFFORT_LBL[tn.effort].toLowerCase()} effort</span>`;
+  if(tn.status==='thinking'||tn.status==='answering'||tn.status==='holding')
+    meta+=`<span class="elapsed">${fmtTime(tn.elapsed||0)}</span>`;
+  let body='';
+
+  if(tn.status==='holding'){
+    body=`<div class="hold-note"><b>${tn.held} tokens</b> held — you'll only pay for what gets written. Reasoning streams in a moment.</div>`;
+  }else{
+    const live = tn.status==='thinking';
+    const collapsed = (tn.status==='answering'||tn.status==='done'||tn.status==='stopped');
+    if(tn.reason){
+      const expect = tn.status==='thinking'
+        ? `<span style="color:var(--mut4);font-weight:500;letter-spacing:0;text-transform:none">answers usually start ~${Math.round(m.firstWord[tn.effort])}s in at this effort</span>` : '';
+      const label = live
+        ? `<span class="tick"></span>THINKING — STREAMED LIVE ${expect}`
+        : `<button class="rtoggle" onclick="toggleReason(${idx})">${tn.reasonOpen?'Hide':'Show'} thinking · ${fmtTime(tn.thoughtFor||0)}</button>`;
+      body+=`<div class="reason ${collapsed?'done':''} ${tn.reasonOpen?'open':''}">
+        <div class="rlabel">${label}</div>
+        <div class="rbody">${esc(tn.reason)}${live?'<span class="caret"></span>':''}</div>
+      </div>`;
+    }
+    if(tn.answer)
+      body+=`<div class="ans">${renderMd(tn.answer)}${tn.status==='answering'?'<span class="caret"></span>':''}</div>`;
+
+    if(tn.status==='stopped'){
+      body+=`<div class="scard" style="margin:14px 0 0">
+        <h4>Stopped.</h4>
+        <p>You were charged <b>${tn.charged} token${tn.charged===1?'':'s'}</b> for what had already been generated. The other <b>${tn.refunded}</b> went back.</p>
+      </div>`;
+    }
+    if(tn.status==='done' && tn.receipt){
+      const r=tn.receipt;
+      const pct=Math.round(r.thinkingShare*100);
+      body+=`<div class="receipt">
+        <div class="row1">
+          <span>charged <b>${r.charged} tokens</b> <span class="usd">(${money(r.charged)})</span></span>
+          <span>${r.refunded} of ${r.held} held came back</span>
+          <span>balance <b>${r.balance}</b></span>
+        </div>
+        <div class="split">
+          <div class="splitbar"><span class="think" style="width:${pct}%"></span><span class="ans-b" style="width:${100-pct}%"></span></div>
+          <span>about ${pct}% went on thinking, ${100-pct}% on the answer you see</span>
+        </div>
+        ${r.cached?`<div class="cache-note"><b>Cheaper than your first message?</b> The whole conversation gets re-sent every turn — but history the model has already seen is read from cache at about a tenth of the price. Follow-ups here cost less, not more.</div>`:''}
+      </div>`;
+    }
+  }
+  return `<div class="t-ai"><div class="t-meta">${meta}</div>${body}</div>`;
+}
+function toggleReason(idx){ S.turns[idx].reasonOpen=!S.turns[idx].reasonOpen; renderTranscript(); }
+function scrollDown(){ const el=$('scroll'); if(el) el.scrollTop=el.scrollHeight; }
+
+/* ════════ send + simulated stream ════════ */
+function send(prefill, skipTo){
+  if(S.phase!=='idle') return;
+  const d=$('draft');
+  const text=(prefill!==undefined?prefill:(d?d.value.trim():''));
+  if(!text) return;
+  if(d){ d.value=''; autosize(d); }
+  const m=MODELS[S.model], e=S.effort;
+
+  if(!S.convTitle){ S.convTitle=text.slice(0,26)+(text.length>26?'…':''); renderSidebar(); }
+  S.turns.push({role:'user', text});
+
+  /* 402 before any streaming */
+  if(S.balance < m.typ[e]){
+    S.turns.push({role:'card402', needed:m.typ[e], have:S.balance, prompt:text});
+    renderTranscript(); scrollDown(); return;
+  }
+
+  const held=Math.min(m.up[e], S.balance);
+  const turn={role:'ai', model:S.model, effort:e, status:'holding', held,
+              reason:'', answer:'', elapsed:0, reasonOpen:false,
+              cached:S.turns.filter(t=>t.role==='ai'&&t.status==='done').length>0};
+  S.turns.push(turn);
+  S.phase='holding'; S.held=held;
+  setBalance(S.balance-held);
+  renderComposer(); renderTranscript(); scrollDown();
+
+  const t0=Date.now(), skip=skipTo||0;
+  S.sim={turn, t0, skip, m, e};
+  S.timer=setInterval(tick, 90);
+}
+
+function tick(){
+  const sim=S.sim; if(!sim) return;
+  const {turn,m,e}=sim;
+  const el=(Date.now()-sim.t0)/1000*SPEED + sim.skip;
+  turn.elapsed=el;
+  const fa=m.firstAny[e], fw=m.firstWord[e], tc=m.complete[e];
+
+  if(el<fa){ turn.status='holding'; }
+  else if(el<fw){
+    if(S.phase!=='thinking'){ S.phase='thinking'; renderComposer(); }
+    turn.status='thinking';
+    turn.reason=revealWords(REASONING,(el-fa)/(fw-fa));
+  }
+  else if(el<tc){
+    if(S.phase!=='answering'){ S.phase='answering'; turn.thoughtFor=fw-fa; renderComposer(); }
+    turn.status='answering';
+    turn.reason=REASONING;
+    turn.answer=revealWords(ANSWER,(el-fw)/(tc-fw));
+  }
+  else{ finish(); return; }
+  renderTranscript(); scrollDown();
+}
+
+function finish(){
+  clearInterval(S.timer); S.timer=null;
+  const {turn,m,e}=S.sim; S.sim=null;
+  turn.status='done'; turn.reason=REASONING; turn.answer=ANSWER;
+  turn.thoughtFor=m.firstWord[e]-m.firstAny[e];
+  const charged=turn.cached ? Math.max(2, Math.round(m.typ[e]*0.4)) : m.typ[e];
+  const refunded=turn.held-charged;
+  const bal=S.balance+refunded;
+  turn.receipt={charged, refunded, held:turn.held, balance:bal,
+                thinkingShare:THINK_SHARE[e], cached:turn.cached};
+  setBalance(bal);
+  S.phase='idle'; S.held=0;
+  renderComposer(); renderTranscript(); scrollDown();
+}
+
+function stopGen(){
+  if(!S.sim) return;
+  clearInterval(S.timer); S.timer=null;
+  const {turn,m,e}=S.sim; S.sim=null;
+  const progress=Math.min(1, turn.elapsed/m.complete[e]);
+  const charged=Math.max(1, Math.round(m.typ[e]*progress*0.6));
+  turn.status='stopped'; turn.charged=charged; turn.refunded=turn.held-charged;
+  turn.thoughtFor=Math.min(turn.elapsed, m.firstWord[e])-m.firstAny[e];
+  if(turn.thoughtFor<0) turn.thoughtFor=0;
+  setBalance(S.balance+turn.refunded);
+  S.phase='idle'; S.held=0;
+  renderComposer(); renderTranscript(); scrollDown();
+}
+
+function sendToLocal(cardIdx){
+  const card=S.turns[cardIdx];
+  const turn={role:'local', shown:'', streaming:true};
+  S.turns.push(turn);
+  renderTranscript(); scrollDown();
+  const words=LOCAL_ANSWER.split(' ');
+  let i=0;
+  const iv=setInterval(()=>{
+    i+=3; turn.shown=words.slice(0,i).join(' ');
+    if(i>=words.length){ turn.shown=LOCAL_ANSWER; turn.streaming=false; clearInterval(iv); }
+    renderTranscript(); scrollDown();
+  }, 70);
+}
+
+function newConversation(){
+  if(S.timer){ clearInterval(S.timer); S.timer=null; S.sim=null; }
+  S.turns=[]; S.convTitle=null; S.phase='idle';
+  if(!S.unlocked){ toast('Coding Spaces is still locked'); return; }
+  renderMain();
+}
+
+/* ════════ unlock intro ════════ */
+let beat=0; const BEATS=5;
+function showIntro(){ beat=0; $('intro').classList.add('show'); renderBeat(); }
+function finishIntro(){
+  $('intro').classList.remove('show');
+  S.introDone=true; renderMain();
+}
+function beatNext(){ if(beat<BEATS-1){ beat++; renderBeat(); } else finishIntro(); }
+function beatBack(){ if(beat>0){ beat--; renderBeat(); } }
+
+let checkPicked=null;
+function renderBeat(){
+  const box=$('beatBox');
+  $('dots').innerHTML=Array.from({length:BEATS},(_,i)=>`<span class="${i===beat?'on':''}"></span>`).join('');
+  $('backBtn').style.visibility=beat===0?'hidden':'visible';
+  const next=$('nextBtn');
+  next.textContent = beat===BEATS-1 ? 'Open Coding Spaces →' : 'Next';
+  next.disabled = (beat===BEATS-1 && checkPicked!==1);
+
+  if(beat===0){
+    box.innerHTML=`
+      <div class="kicker">CODING SPACES · UNLOCKED</div>
+      <h1>You've reached the frontier.</h1>
+      <p class="lede">Everything so far ran on your laptop: a <b>0.5&nbsp;billion</b> parameter model, free, private, yours. Coding Spaces connects you to <b>Claude Opus&nbsp;5</b> and <b>Claude Fable&nbsp;5</b> — among the largest models in existence, running in a data centre.</p>
+      <div class="scale-viz">
+        <div class="item"><span class="c-small"></span><span class="cap">qwen2.5 · 0.5B<br>your laptop</span></div>
+        <div class="item"><span class="c-big"></span><span class="cap">Opus 5 / Fable 5<br>a data centre</span></div>
+      </div>
+      <p class="scale-note">Not to scale — the real gap is far bigger than we can draw.</p>
+      <p class="lede" style="margin-top:14px">Your local model can't reliably write a working program or reason through a multi-step problem. <b>These can.</b></p>`;
+    setTimeout(()=>burstAt('.c-big'),350);
+  }
+  if(beat===1){
+    box.innerHTML=`
+      <div class="kicker">THE TRADEOFF</div>
+      <h1>Capability has three costs.</h1>
+      <div class="trade">
+        <div class="row"><span class="k">Not free.</span><span class="v">Every message spends tokens you earned on the local track. They buy real compute that costs real money.</span></div>
+        <div class="row"><span class="k">Not private.</span><span class="v">Your words leave your machine and travel to a data centre. Your local model never does that.</span></div>
+        <div class="row"><span class="k">Not instant.</span><span class="v">Big models think before they answer — sometimes for half a minute. You'll watch that thinking happen, live.</span></div>
+      </div>`;
+  }
+  if(beat===2){
+    box.innerHTML=`
+      <div class="kicker">YOUR TOKENS</div>
+      <h1>Tokens are money now.</h1>
+      <p class="lede">Until today they were a score. Here, one token buys about <b>$0.0083</b> of frontier compute. You have <b>${S.balance}</b> — roughly ${money(S.balance).replace('$','$')} worth.</p>
+      <div class="coins">
+        <div class="crow"><span class="cdots">${'<span class="cdot"></span>'.repeat(10)}</span><span class="clbl"><b>~10 messages</b> to Opus 5 at medium effort (~7 each)</span></div>
+        <div class="crow"><span class="cdots"><span class="cdot big"></span><span class="cdot big"></span></span><span class="clbl"><b>or just 2</b> at Fable 5's max effort (25 each)</span></div>
+      </div>
+      <p class="lede" style="margin-top:22px;color:var(--mut2);font-size:14px">You'll always see a ceiling before you send, and anything unused comes straight back. Spending them is the point — just spend them on purpose.</p>`;
+  }
+  if(beat===3){
+    box.innerHTML=`
+      <div class="kicker">THE NEW CONTROL</div>
+      <h1>Effort is a dial.</h1>
+      <p class="lede">It sets how long the model thinks before answering. More effort: better answers on genuinely hard problems, more tokens, longer waits. Try it — the price updates before you spend anything.</p>
+      <div class="mini-dial-wrap" id="miniDial"></div>
+      <p class="lede" style="margin-top:16px;font-size:13.5px;color:var(--mut2)" id="miniNote"></p>`;
+    renderMiniDial();
+  }
+  if(beat===4){
+    box.innerHTML=`
+      <div class="kicker">ONE LAST THING</div>
+      <h1>Quick check before you go in.</h1>
+      <p class="lede">The price you see before sending says <b>“up to 13 tokens”</b>. What will you actually be charged?</p>
+      <div class="check" id="check">
+        <button class="opt" onclick="pickCheck(0,this)">Exactly 13 — that's the price.</button>
+        <button class="opt" onclick="pickCheck(1,this)">Usually much less. 13 is the ceiling; whatever isn't used comes back.</button>
+        <button class="opt" onclick="pickCheck(2,this)">13, plus a little extra for the thinking.</button>
+      </div>
+      <div class="check-fb" id="checkFb"></div>`;
+    if(checkPicked===1){ [...document.querySelectorAll('#check .opt')][1].classList.add('right'); $('checkFb').textContent='Right — you only pay for what the model actually writes.'; }
+  }
+}
+let miniModel='opus', miniEffort=2;
+function renderMiniDial(){
+  const wrap=$('miniDial'); if(!wrap) return;
+  const m=MODELS[miniModel];
+  const maxCost=Math.max(...m.up);
+  const bars=EFFORTS.map((_,i)=>{
+    const h=Math.max(5,Math.round(m.up[i]/maxCost*30));
+    return `<button class="stop ${i===miniEffort?'on':''}" onclick="miniEffort=${i};renderMiniDial()"><span class="bar" style="height:${h}px"></span></button>`;
+  }).join('');
+  const lbls=EFFORT_LBL.map((l,i)=>`<span class="${i===miniEffort?'on':''}">${l}</span>`).join('');
+  wrap.innerHTML=`
+    <div class="seg">
+      <button class="${miniModel==='opus'?'on':''}" onclick="miniModel='opus';renderMiniDial()">Opus 5</button>
+      <button class="${miniModel==='fable'?'on':''}" onclick="miniModel='fable';renderMiniDial()">Fable 5</button>
+    </div>
+    <div class="dial"><span class="dial-cap">EFFORT</span><div class="dial-stops">${bars}</div><div class="dial-lbls">${lbls}</div></div>
+    <div class="price" style="margin-left:auto">
+      <span class="up">up to ${m.up[miniEffort]} tokens</span>
+      <span class="sub">usually ~${m.typ[miniEffort]} · answer starts ~${Math.round(m.firstWord[miniEffort])}s in</span>
+    </div>`;
+  const note=$('miniNote');
+  if(note) note.textContent = miniModel==='fable'
+    ? 'Notice Fable 5\u2019s shape: low and medium cost the same, then max jumps to 4\u00d7. On this model the dial is really a two-position switch.'
+    : 'Opus 5 climbs steadily \u2014 each step buys a little more thinking time.';
+}
+function pickCheck(i,el){
+  checkPicked=i;
+  document.querySelectorAll('#check .opt').forEach(o=>o.classList.remove('right','wrong'));
+  if(i===1){ el.classList.add('right'); $('checkFb').textContent='Right — you only pay for what the model actually writes.'; }
+  else{ el.classList.add('wrong'); $('checkFb').textContent='Not quite. It\u2019s a worst case — most messages come in well under it, and the difference is returned.'; }
+  $('nextBtn').disabled = checkPicked!==1;
+}
+
+/* ════════ demo strip ════════ */
+function resetSim(){ if(S.timer){clearInterval(S.timer);S.timer=null;} S.sim=null; S.phase='idle'; }
+function demoLocked(){ resetSim(); S.unlocked=false; S.turns=[]; S.convTitle=null; $('intro').classList.remove('show'); renderMain(); }
+function demoUnlock(){
+  resetSim(); S.unlocked=true; S.turns=[]; S.convTitle=null; renderMain();
+  burstAt('#navCS'); toast('Coding Spaces unlocked');
+  setTimeout(showIntro, 900);
+}
+function demoEmpty(){ resetSim(); S.unlocked=true; S.introDone=true; S.turns=[]; S.convTitle=null; S.balance=72; $('pillNum').textContent='72'; $('intro').classList.remove('show'); renderMain(); }
+function demoThinking(){ demoEmpty(); S.model='opus'; S.effort=4; renderComposer(); send(SAMPLE_PROMPT, 6); }
+function demoAnswering(){ demoEmpty(); S.model='opus'; S.effort=4; renderComposer(); send(SAMPLE_PROMPT, MODELS.opus.firstWord[4]+1); }
+function demoReceipt(){ demoEmpty(); S.model='opus'; S.effort=4; renderComposer(); send(SAMPLE_PROMPT, MODELS.opus.complete[4]+1); }
+function demoTurn2(){
+  demoEmpty(); S.model='opus'; S.effort=2; renderComposer();
+  S.convTitle='My sudoku solver retur…'; renderSidebar();
+  S.turns=[
+    {role:'user', text:SAMPLE_PROMPT},
+    {role:'ai', model:'opus', effort:2, status:'done', held:15, reason:REASONING, answer:ANSWER,
+     thoughtFor:10.3, reasonOpen:false, cached:false,
+     receipt:{charged:8, refunded:7, held:15, balance:64, thinkingShare:0.38, cached:false}},
+  ];
+  S.balance=64; $('pillNum').textContent='64';
+  renderTranscript();
+  send("Great — now write that regression test as a full runnable file with a tiny board fixture.", MODELS.opus.complete[2]+1);
+}
+function demoBroke(){
+  demoEmpty(); S.balance=4; $('pillNum').textContent='4';
+  S.model='fable'; S.effort=4; renderComposer();
+  send(SAMPLE_PROMPT);
+}
+function demoStopped(){
+  demoEmpty(); S.model='fable'; S.effort=4; renderComposer();
+  send(SAMPLE_PROMPT, 12);
+  setTimeout(stopGen, 2200);
+}
+function demoDeclined(){
+  demoEmpty();
+  S.convTitle='Write a keylogger for m…'; renderSidebar();
+  S.turns=[{role:'user', text:"Write a keylogger for my school's computer lab."}];
+  renderTranscript();
+  setTimeout(()=>{
+    S.turns.push({role:'declined', model:S.model});
+    renderTranscript(); scrollDown();
+  }, 900);
+}
+
+/* ════════ boot ════════ */
+demoLocked();
+</script>
+</body>
+</html>

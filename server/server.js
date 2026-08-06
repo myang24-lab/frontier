@@ -29,10 +29,59 @@ function serveFile(res, file) {
   });
 }
 
+// Frontier tier: forward /frontier/* to the relay, which holds the Claude API
+// key and the token ledger. This bridge never sees the key — it only passes
+// bytes through, streaming included, so SSE arrives incrementally rather than
+// in one lump at the end.
+//
+// Everything else in this file is unchanged: if the relay is down or the
+// student is offline, the Ollama chat, the pty terminal and the sub-agent all
+// keep working exactly as before.
+const RELAY_URL = process.env.RELAY_URL || 'http://localhost:8787';
+
+function proxyToRelay(req, res) {
+  const target = new URL(req.url.replace(/^\/frontier/, ''), RELAY_URL);
+  const upstream = http.request(
+    {
+      hostname: target.hostname,
+      port: target.port,
+      path: target.pathname + target.search,
+      method: req.method,
+      headers: { ...req.headers, host: target.host },
+    },
+    (upRes) => {
+      res.writeHead(upRes.statusCode, upRes.headers);
+      upRes.pipe(res); // streams SSE through as it arrives
+    }
+  );
+
+  upstream.on('error', (err) => {
+    // The relay being unreachable is an ordinary situation, not a crash: the
+    // student is offline, or it simply isn't running. Say so in the shape the
+    // frontend already handles.
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        error: {
+          code: 'relay_unreachable',
+          message: `Can't reach the frontier relay at ${RELAY_URL}. Your local model is unaffected. (${err.code || err.message})`,
+        },
+      }));
+    } else {
+      res.end();
+    }
+  });
+
+  // A student closing the tab should stop generation upstream, not just here.
+  req.on('close', () => upstream.destroy());
+  req.pipe(upstream);
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'content-type');
   if (req.method === 'OPTIONS') return res.end();
+  if (req.url.startsWith('/frontier/')) return proxyToRelay(req, res);
   if (req.url === '/agent' && req.method === 'POST') {
     let body = '';
     req.on('data', c => (body += c));

@@ -42,7 +42,13 @@ const PROMPTS = [
 ];
 
 const QUICK_PROMPTS = ['quick-fact', 'homework-math', 'essay-outline', 'long-task'];
-const EFFORTS = ['low', 'medium', 'max'];
+// `--efforts high,xhigh` measures only the named levels. The first sweep did
+// low/medium/max; this is how the remaining two get filled in without paying
+// to re-measure what's already known.
+const effortFlag = process.argv.slice(2).find((a) => a.startsWith('--efforts='));
+const EFFORTS = effortFlag
+  ? effortFlag.slice('--efforts='.length).split(',').map((s) => s.trim()).filter(Boolean)
+  : ['low', 'medium', 'max'];
 const MAX_TOKENS = 4000; // enough to finish these tasks without capping them early
 
 const args = process.argv.slice(2);
@@ -52,7 +58,7 @@ const prompts = QUICK ? PROMPTS.filter((p) => QUICK_PROMPTS.includes(p.id)) : PR
 
 // ── Cost estimate, so nobody is surprised ────────────────────────────────────
 // Rough per-call output guesses from what steps 3-7 actually produced.
-const ASSUMED_OUTPUT = { low: 700, medium: 1100, max: 1800 };
+const ASSUMED_OUTPUT = { low: 700, medium: 1100, high: 1400, xhigh: 1600, max: 1800 };
 function estimateUSD() {
   let total = 0;
   for (const id of models.ALLOWED) {
@@ -62,6 +68,13 @@ function estimateUSD() {
     }
   }
   return total;
+}
+
+for (const e of EFFORTS) {
+  if (!models.isValidEffort(e)) {
+    console.error(`\n✕ "${e}" is not an effort level. Use: ${models.EFFORT_LEVELS.join(', ')}\n`);
+    process.exit(1);
+  }
 }
 
 const runs = prompts.length * models.ALLOWED.length * EFFORTS.length;
@@ -230,6 +243,17 @@ function recommendRate(groups) {
   const ok = results.filter((r) => !r.error);
   const groups = summarise(ok);
   printTable(groups);
+
+  // Ready to paste into typicals.js — this is what feeds the "usually ~N"
+  // figure the student sees next to the ceiling.
+  console.log('\n## For relay/typicals.js — median micro-dollars\n');
+  for (const model of models.ALLOWED) {
+    const rows = groups.filter((g) => g.model === model);
+    if (!rows.length) continue;
+    console.log(`  '${model}': {`);
+    for (const g of rows) console.log(`    ${g.effort}: ${g.medianMicroUSD},   // measured, n=${g.n}`);
+    console.log('  },');
+  }
   const rate = recommendRate(groups);
 
   console.log(`\n  total spent on this sweep: $${(spentMicroUSD / 1e6).toFixed(4)} across ${ok.length} calls\n`);

@@ -11,6 +11,7 @@ const models = require('./models');
 const pricing = require('./pricing');
 const { Ledger } = require('./ledger');
 const metering = require('./metering');
+const typicals = require('./typicals');
 
 config.require(); // exits with an actionable message if the key is missing
 
@@ -311,6 +312,11 @@ async function handleEstimate(req, res) {
     // every token available to it. Nearly always less in practice, which is why
     // the `done` event reports the refund.
     maxTokenCost: plan.ok ? plan.holdTokens : null,
+    // What messages like this have actually cost, from calibration. `null` for
+    // combinations not yet measured — the UI omits the line rather than
+    // inventing a number. Without this the ceiling reads as the price, and it
+    // overstates by roughly 4x.
+    typicalTokenCost: typicals.typicalTokenCost(model, effort || models.DEFAULT_EFFORT),
     maxOutputTokens: plan.ok ? plan.maxTokens : null,
     neededTokens: plan.ok ? null : plan.neededTokens,
     warnings: metering.warningsFor({ plan, balanceTokens, estimatedInputTokens, messageCount: conversation.length }),
