@@ -72,8 +72,12 @@ function proxyToRelay(req, res) {
     }
   });
 
-  // A student closing the tab should stop generation upstream, not just here.
-  req.on('close', () => upstream.destroy());
+  // A student closing the tab should stop generation upstream, not just here —
+  // but only then. `req.on('close')` also fires when a request simply finishes
+  // being received, which on a plain GET means killing the upstream connection
+  // before the reply arrives. Watch the response instead, and only act if it
+  // hasn't already completed.
+  res.on('close', () => { if (!res.writableEnded) upstream.destroy(); });
   req.pipe(upstream);
 }
 

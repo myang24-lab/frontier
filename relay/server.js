@@ -604,6 +604,27 @@ const server = http.createServer((req, res) => {
     });
   }
 
+  // GET /pricing — the whole cost table in one call.
+  //
+  // The effort dial draws each stop's bar height from what that stop actually
+  // costs, which otherwise would mean ten /estimate round trips just to render
+  // the control. Fetched once; nothing here depends on the student.
+  if (req.method === 'GET' && url === '/pricing') {
+    const table = {};
+    for (const id of models.ALLOWED) {
+      const spec = models.get(id);
+      const typical = {};
+      for (const effort of models.EFFORT_LEVELS) typical[effort] = typicals.typicalTokenCost(id, effort);
+      table[id] = { id, label: spec.label, tier: spec.tier, pricePerMTok: spec.pricePerMTok, typicalTokens: typical };
+    }
+    return json(res, 200, {
+      models: table,
+      efforts: models.EFFORT_LEVELS,
+      defaultEffort: models.DEFAULT_EFFORT,
+      microUSDPerToken: require('./ledger').MICRO_USD_PER_APP_TOKEN,
+    });
+  }
+
   // GET /balance/:studentId
   if (req.method === 'GET' && url.startsWith('/balance/')) {
     const studentId = decodeURIComponent(url.slice('/balance/'.length));

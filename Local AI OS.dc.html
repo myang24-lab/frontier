@@ -50,6 +50,142 @@ input:focus,textarea:focus,button:focus{outline:none}
 @keyframes shimmerBurst{from{transform:translate(-50%,-50%) scale(.2);opacity:.9}to{transform:translate(-50%,-50%) scale(3);opacity:0}}
 @keyframes particleFly{to{transform:translate(var(--dx),var(--dy)) scale(.15);opacity:0}}
 @keyframes lockOut{to{opacity:0;transform:scale(.5)}}
+@keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
+
+/* ══════════════════════════════════════════════════════════════
+   CODING SPACES — the frontier tier.
+   Ported from the design handoff. The rest of this app styles
+   everything inline; this screen is complex enough that classes
+   are clearer. Nothing above uses CSS classes, so there are no
+   collisions to worry about.
+   ══════════════════════════════════════════════════════════════ */
+.cs{
+  --paper:#FAF9F5; --surface:#FFFFFF; --sidebar:#F4F1EA;
+  --fill1:#FAF8F3; --fill2:#F2EFE8; --fill3:#EFEBE2; --fill4:#ECE8DE; --fill5:#E7E2D6;
+  --border:#E7E2D9; --ink:#26241E;
+  --mut1:#6E6A60; --mut2:#8A8578; --mut3:#A9A492; --mut4:#B5AF9F; --mut5:#C4BFB2;
+  --accent:#C15F3C; --accent-h:#A24E30;
+  --gold:#C79014; --gold-deep:#8A6A0E; --gold-light:#E3B23C;
+  --error:#C0442A; --success:#7BA05B;
+  --dark:#1E1C18; --dark2:#2A2722; --on-dark:#D8D3C8;
+  --serif:'Newsreader',Georgia,serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:ui-monospace,Menlo,monospace;
+  flex:1;display:flex;flex-direction:column;min-width:0;position:relative;
+}
+.cs *{box-sizing:border-box}
+
+/* sidebar additions */
+.sb-head{font-size:10.5px;letter-spacing:.14em;font-weight:600;color:#A9A492;padding:0 10px;margin:16px 0 6px;display:flex;align-items:center;gap:6px}
+.sb-empty{padding:6px 10px;font-size:12.5px;color:#B5AF9F;font-style:italic}
+.fdot{width:7px;height:7px;flex:none;background:#1E1C18;transform:rotate(45deg);border-radius:1.5px}
+
+/* panel header — the dark chip is the tier marker */
+.cs .panel-head{display:flex;align-items:center;gap:12px;padding:14px 24px 12px;border-bottom:1px solid rgba(231,226,217,.7)}
+.cs .panel-title{font-family:var(--serif);font-weight:500;font-size:18px}
+.cs .chip-frontier{display:inline-flex;align-items:center;gap:7px;background:var(--dark);color:var(--on-dark);border-radius:999px;padding:4px 12px;font-size:11px;font-weight:600;letter-spacing:.04em}
+.cs .chip-frontier .d{width:6px;height:6px;background:var(--on-dark);transform:rotate(45deg);border-radius:1px}
+
+/* transcript */
+.cs .scroll{flex:1;overflow-y:auto;padding:24px 24px 12px}
+.cs .col{max-width:680px;margin:0 auto}
+.cs .hero{padding-top:14vh;text-align:center;animation:fadeUp .4s ease both}
+.cs .hero h2{font-family:var(--serif);font-weight:500;font-size:28px;margin:0 0 10px}
+.cs .hero p{font-size:14px;color:var(--mut2);margin:0 0 6px;line-height:1.6}
+.cs .hero .try{display:inline-flex;flex-direction:column;gap:8px;margin-top:26px}
+.cs .hero .try button{border:1px solid var(--border);background:var(--surface);border-radius:10px;padding:10px 16px;font-size:13.5px;color:var(--mut1);cursor:pointer;text-align:left}
+.cs .hero .try button:hover{border-color:var(--accent);color:var(--accent-h)}
+.cs .t-user{display:flex;justify-content:flex-end;margin:18px 0}
+.cs .t-user .bub{max-width:72%;background:var(--fill3);border-radius:14px 14px 4px 14px;padding:10px 15px;font-size:14.5px;line-height:1.55;white-space:pre-wrap}
+.cs .t-ai{margin:18px 0;animation:fadeUp .3s ease both}
+.cs .badge-f{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:var(--on-dark);background:var(--dark);border-radius:6px;padding:3px 10px;letter-spacing:.03em}
+.cs .badge-f .d{width:5px;height:5px;background:var(--on-dark);transform:rotate(45deg);border-radius:1px}
+.cs .badge-l{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--accent);background:rgba(193,95,60,.08);border-radius:6px;padding:3px 9px}
+.cs .t-meta{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:11.5px;color:var(--mut3)}
+.cs .t-meta .elapsed{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--mut2)}
+.cs .hold-note{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--mut2);background:var(--fill1);border:1px solid var(--fill3);border-radius:9px;padding:8px 13px;animation:breathe 2.2s ease-in-out infinite}
+.cs .hold-note b{color:var(--gold-deep);font-weight:600;font-family:var(--mono)}
+
+/* reasoning: dominant while thinking, then collapses to a toggle */
+.cs .reason{border-left:2px solid var(--fill5);padding:2px 0 2px 16px;margin:4px 0 6px;transition:opacity .4s ease}
+.cs .reason .rlabel{font-size:11px;letter-spacing:.14em;font-weight:600;color:var(--mut3);margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.cs .reason .rlabel .tick{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:breathe 1.4s ease-in-out infinite}
+.cs .reason .rbody{font-size:14px;line-height:1.75;color:var(--mut1);white-space:pre-wrap;max-height:1200px;transition:max-height .6s cubic-bezier(.22,1,.36,1)}
+.cs .reason.done{opacity:.9}
+.cs .reason.done .rbody{max-height:0;overflow:hidden}
+.cs .reason.done.open .rbody{max-height:1200px;padding-top:8px}
+.cs .rtoggle{border:none;background:none;padding:0;font-size:12px;color:var(--mut3);cursor:pointer;font-weight:600}
+.cs .rtoggle:hover{color:var(--accent)}
+.cs .ans{font-size:14.5px;line-height:1.68;margin-top:12px}
+.cs .ans p{margin:0 0 12px}
+.cs .ans h3{font-family:var(--serif);font-weight:600;font-size:17px;margin:18px 0 8px}
+.cs .ans ul,.cs .ans ol{margin:0 0 12px;padding-left:22px}
+.cs .ans li{margin:0 0 5px}
+.cs .ans pre{background:var(--dark);color:var(--on-dark);border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:13px;line-height:1.6;overflow-x:auto;margin:0 0 12px}
+.cs .ans code.inl{font-family:var(--mono);font-size:13px;background:var(--fill2);border-radius:4px;padding:1px 5px}
+.cs .caret{display:inline-block;width:8px;height:15px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1.05s steps(1) infinite}
+
+/* receipt */
+.cs .receipt{margin-top:14px;border:1px solid var(--border);background:var(--fill1);border-radius:12px;padding:13px 16px;font-size:12.5px;color:var(--mut1);animation:fadeUp .35s ease both}
+.cs .receipt .row1{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;font-family:var(--mono);font-size:12.5px}
+.cs .receipt .row1 b{color:var(--gold-deep);font-weight:600}
+.cs .receipt .usd{color:var(--mut4)}
+.cs .split{display:flex;align-items:center;gap:10px;margin-top:11px}
+.cs .splitbar{flex:1;max-width:260px;height:6px;border-radius:99px;overflow:hidden;display:flex;background:var(--fill3)}
+.cs .splitbar .think{background:var(--mut5);height:100%}
+.cs .splitbar .ans-b{background:var(--gold-light);height:100%}
+.cs .cache-note{margin-top:10px;padding-top:10px;border-top:1px solid var(--fill3);color:var(--mut2);line-height:1.55}
+.cs .cache-note b{color:var(--ink);font-weight:600}
+
+/* failure cards */
+.cs .scard{margin:18px 0;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:16px 18px;animation:fadeUp .3s ease both;max-width:560px}
+.cs .scard h4{font-family:var(--serif);font-weight:600;font-size:16.5px;margin:0 0 6px}
+.cs .scard p{font-size:13.5px;color:var(--mut1);line-height:1.6;margin:0}
+.cs .scard p b{color:var(--ink)}
+.cs .scard .acts{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.cs .btn{border:none;background:var(--accent);color:#fff;border-radius:9px;padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer}
+.cs .btn:hover{background:var(--accent-h)}
+.cs .btn-ghost{border:1px solid var(--border);background:var(--fill1);color:var(--mut1);border-radius:9px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer}
+.cs .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* composer */
+.cs .comp-wrap{padding:0 24px 20px}
+.cs .comp{max-width:680px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 14px 10px;box-shadow:0 2px 10px rgba(38,36,30,.04)}
+.cs .comp textarea{width:100%;border:none;background:none;resize:none;font-size:14.5px;line-height:1.5;padding:2px;min-height:22px;max-height:120px;font-family:var(--sans)}
+.cs .comp-row{display:flex;align-items:flex-end;gap:16px;margin-top:8px;padding-top:10px;border-top:1px solid var(--fill2)}
+.cs .seg{display:flex;background:var(--fill2);border-radius:9px;padding:3px;gap:2px;flex:none}
+.cs .seg button{border:none;background:none;border-radius:7px;padding:6px 13px;font-size:12.5px;font-weight:600;color:var(--mut2);cursor:pointer;white-space:nowrap;flex:none}
+.cs .seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(38,36,30,.08)}
+.cs .dial{display:flex;flex-direction:column;gap:3px;flex:none}
+.cs .dial-cap{font-size:10.5px;letter-spacing:.1em;font-weight:600;color:var(--mut3)}
+.cs .dial-stops{display:flex;align-items:flex-end;gap:5px;height:34px}
+.cs .stop{width:26px;display:flex;flex-direction:column;align-items:center;border:none;background:none;padding:0;cursor:pointer;height:100%;justify-content:flex-end}
+.cs .stop .bar{width:100%;border-radius:3px 3px 0 0;background:var(--fill5);transition:height .25s cubic-bezier(.22,1,.36,1),background .2s}
+.cs .stop:hover .bar{background:var(--mut5)}
+.cs .stop.on .bar{background:var(--gold)}
+.cs .dial-lbls{display:flex;gap:5px}
+.cs .dial-lbls span{width:26px;text-align:center;font-size:9.5px;color:var(--mut4);font-weight:600}
+.cs .dial-lbls span.on{color:var(--gold-deep)}
+.cs .price{margin-left:auto;text-align:right;display:flex;flex-direction:column;gap:2px;align-items:flex-end;min-width:0}
+.cs .price .up{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--gold-deep);font-variant-numeric:tabular-nums}
+.cs .price .up.bump{animation:pillBounce .35s ease}
+.cs .price .sub{font-size:11px;color:var(--mut3)}
+.cs .price .warn{font-size:11px;color:var(--gold-deep);max-width:200px;text-align:right;line-height:1.4}
+.cs .send{width:36px;height:36px;flex:none;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cs .send:hover{background:var(--accent-h)}
+.cs .send:disabled{background:var(--fill5);color:var(--mut4);cursor:default}
+.cs .stopbtn{border:1px solid var(--border);background:var(--surface);color:var(--mut1);border-radius:10px;padding:8px 16px;font-size:12.5px;font-weight:600;cursor:pointer;margin-left:auto}
+.cs .stopbtn:hover{border-color:var(--error);color:var(--error)}
+.cs .stopbtn .sq{display:inline-block;width:9px;height:9px;background:currentColor;border-radius:2px;margin-right:8px;vertical-align:-1px}
+.cs .comp-foot{max-width:680px;margin:8px auto 0;display:flex;justify-content:center;font-size:11.5px;color:var(--mut4)}
+
+/* locked */
+.cs .locked{flex:1;display:flex;align-items:center;justify-content:center}
+.cs .locked-inner{text-align:center;max-width:440px;padding:0 24px;animation:fadeUp .4s ease both}
+.cs .locked-inner .biglock{position:relative;width:26px;height:20px;background:var(--mut4);border-radius:4px;display:inline-block;margin-bottom:22px}
+.cs .locked-inner .biglock::before{content:"";position:absolute;left:4.5px;top:-13px;width:17px;height:16px;border:3.5px solid var(--mut4);border-bottom:none;border-radius:12px 12px 0 0}
+.cs .locked-inner h2{font-family:var(--serif);font-weight:500;font-size:26px;margin:0 0 10px}
+.cs .locked-inner p{font-size:14px;color:var(--mut2);line-height:1.65;margin:0}
 </style>
 </helmet>
 <div style="min-height:100vh;background:#FAF9F5" data-screen-label="Local AI OS">
@@ -164,10 +300,23 @@ input:focus,textarea:focus,button:focus{outline:none}
         <button onClick="{{ addSession }}" style="display:flex;align-items:center;gap:9px;width:100%;border:1px solid #E0DBD0;background:#FFFFFF;border-radius:9px;padding:9px 12px;font-size:13.5px;font-weight:600;cursor:pointer;color:#26241E;box-sizing:border-box" style-hover="border-color:#C15F3C">
           <span style="font-size:16px;line-height:1;color:#C15F3C;font-weight:400">+</span> New session
         </button>
-        <div data-guide="chat-nav" style="margin-top:14px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;max-height:32vh">
+        <!-- Local and frontier conversations share one sidebar but never
+             intermix: two labelled groups, so which tier a session belongs to
+             is never in doubt. -->
+        <div data-guide="chat-nav" style="margin-top:6px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;max-height:32vh">
+          <div class="sb-head">ON YOUR LAPTOP</div>
           <sc-for list="{{ sessionList }}" as="s" hint-placeholder-count="2">
             <div onClick="{{ s.select }}" style="{{ s.style }}" style-hover="background:#ECE8DE">{{ s.title }}</div>
           </sc-for>
+          <sc-if value="{{ csUnlocked }}" hint-placeholder-val="{{ false }}">
+            <div class="sb-head" style="margin-top:18px"><span class="fdot"></span> CODING SPACES</div>
+            <sc-for list="{{ csSessionList }}" as="f" hint-placeholder-count="0">
+              <div onClick="{{ f.select }}" style="{{ f.style }}" style-hover="background:#ECE8DE">{{ f.title }}</div>
+            </sc-for>
+            <sc-if value="{{ csNoSessions }}" hint-placeholder-val="{{ true }}">
+              <div class="sb-empty">no frontier chats yet</div>
+            </sc-if>
+          </sc-if>
         </div>
         <div style="height:1px;background:#E7E2D9;margin:16px 6px"></div>
         <div style="display:flex;flex-direction:column;gap:2px">
@@ -181,9 +330,14 @@ input:focus,textarea:focus,button:focus{outline:none}
               <span style="position:relative;width:10px;height:8px;background:#B5AF9F;border-radius:2px;display:block;margin-top:3px"><span style="position:absolute;left:2px;top:-5px;width:6px;height:6px;border:1.5px solid #B5AF9F;border-bottom:none;border-radius:5px 5px 0 0;box-sizing:border-box;display:block"></span></span>
             </sc-if>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13.5px;color:#B5AF9F;cursor:default">
+          <div onClick="{{ navSpaces }}" data-guide="spaces-nav" style="{{ spacesNavStyle }}" style-hover="{{ spacesNavHover }}">
             <span style="flex:1">Coding Spaces</span>
-            <span style="position:relative;width:10px;height:8px;background:#B5AF9F;border-radius:2px;display:block;margin-top:3px"><span style="position:absolute;left:2px;top:-5px;width:6px;height:6px;border:1.5px solid #B5AF9F;border-bottom:none;border-radius:5px 5px 0 0;box-sizing:border-box;display:block"></span></span>
+            <sc-if value="{{ csLocked }}" hint-placeholder-val="{{ true }}">
+              <span style="position:relative;width:10px;height:8px;background:#B5AF9F;border-radius:2px;display:block;margin-top:3px"><span style="position:absolute;left:2px;top:-5px;width:6px;height:6px;border:1.5px solid #B5AF9F;border-bottom:none;border-radius:5px 5px 0 0;box-sizing:border-box;display:block"></span></span>
+            </sc-if>
+            <sc-if value="{{ csUnlocked }}" hint-placeholder-val="{{ false }}">
+              <span class="fdot"></span>
+            </sc-if>
           </div>
         </div>
         <div style="flex:1"></div>
@@ -355,6 +509,87 @@ input:focus,textarea:focus,button:focus{outline:none}
             </div>
           </div>
         </sc-if>
+
+        <!-- ── CODING SPACES · the frontier tier ── -->
+        <sc-if value="{{ panelSpaces }}" hint-placeholder-val="{{ false }}">
+          <div class="cs" data-screen-label="Coding Spaces">
+
+            <sc-if value="{{ csLocked }}" hint-placeholder-val="{{ true }}">
+              <div class="locked">
+                <div class="locked-inner">
+                  <span class="biglock"></span>
+                  <h2>Coding Spaces is still locked.</h2>
+                  <p>{{ csLockedHint }}</p>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ csUnlocked }}" hint-placeholder-val="{{ false }}">
+              <!-- The dark chip is the tier marker. Nothing on the local side
+                   ever uses a dark surface in light chrome, so it reads at a
+                   glance as "this one leaves your machine". -->
+              <div class="panel-head">
+                <div class="panel-title">Coding Spaces</div>
+                <span class="chip-frontier"><span class="d"></span>FRONTIER · RUNS IN A DATA CENTRE</span>
+              </div>
+
+              <div ref="{{ csScrollRef }}" class="scroll">
+                <div class="col">
+                  <sc-if value="{{ csEmpty }}" hint-placeholder-val="{{ true }}">
+                    <div class="hero">
+                      <h2>This is the frontier tier.</h2>
+                      <p>Models far larger than the one on your laptop, running in a data centre.</p>
+                      <p>They cost tokens, and they take longer. Spend them on purpose.</p>
+                      <div class="try">
+                        <sc-for list="{{ csSuggestions }}" as="sg" hint-placeholder-count="1">
+                          <button onClick="{{ sg.pick }}">{{ sg.text }}</button>
+                        </sc-for>
+                      </div>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+
+              <div class="comp-wrap">
+                <div class="comp">
+                  <textarea ref="{{ csInputRef }}" value="{{ csInput }}" onChange="{{ csOnInput }}" onKeyDown="{{ csOnKey }}" placeholder="Ask something your local model can't do…" rows="1"></textarea>
+                  <div class="comp-row">
+                    <div class="seg">
+                      <sc-for list="{{ csModelOptions }}" as="mo" hint-placeholder-count="2">
+                        <button onClick="{{ mo.pick }}" class="{{ mo.cls }}">{{ mo.label }}</button>
+                      </sc-for>
+                    </div>
+                    <!-- The dial is a bar chart on purpose: bar height is that
+                         stop's ceiling cost, so Fable 5's flat-flat-then-cliff
+                         shape is visible without a caption explaining it. -->
+                    <div class="dial">
+                      <div class="dial-cap">EFFORT</div>
+                      <div class="dial-stops">
+                        <sc-for list="{{ csEffortStops }}" as="st" hint-placeholder-count="5">
+                          <button onClick="{{ st.pick }}" class="{{ st.cls }}" title="{{ st.title }}"><span class="bar" style="height:{{ st.h }}"></span></button>
+                        </sc-for>
+                      </div>
+                      <div class="dial-lbls">
+                        <sc-for list="{{ csEffortStops }}" as="st2" hint-placeholder-count="5">
+                          <span class="{{ st2.lblCls }}">{{ st2.short }}</span>
+                        </sc-for>
+                      </div>
+                    </div>
+                    <div class="price">
+                      <span class="{{ csPriceCls }}">{{ csPriceUp }}</span>
+                      <span class="sub">{{ csPriceSub }}</span>
+                      <sc-if value="{{ csPriceWarn }}" hint-placeholder-val="{{ false }}">
+                        <span class="warn">{{ csPriceWarn }}</span>
+                      </sc-if>
+                    </div>
+                    <button onClick="{{ csSend }}" class="send" disabled="{{ csSendDisabled }}">↑</button>
+                  </div>
+                </div>
+                <div class="comp-foot">Priced before you send, free — only what the model actually writes is charged.</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
       </div>
     </div>
   </sc-if>
@@ -444,6 +679,29 @@ class Component extends DCLogic {
   static AGENT_ENDPOINT = 'http://localhost:3001/agent'; // real sub-agent loop (server/agent.py)
   static AGENT_MODEL = 'qwen2.5:1.5b';               // must match MODEL in server/agent.py
 
+  // ── Frontier tier (Coding Spaces) ──────────────────────────
+  // Reached through the local bridge, which forwards to the relay. The API key
+  // lives on the relay and never arrives here.
+  static FRONTIER_ENDPOINT = '/frontier';
+
+  // ⚠ THE IDENTITY SEAM. The relay charges whichever student id it is given.
+  // This fixed value is a development placeholder — replace this one function
+  // with a lookup against the real account system, and everything downstream
+  // (balance, spending, history) follows automatically. Nothing else in this
+  // file knows where the id comes from.
+  static studentId() { return 'dev-student'; }
+
+  // ⚠ THE EARNING SEAM. Tokens are awarded by the relay's ledger, never by the
+  // browser — a balance the client can edit is not a balance. When the local
+  // track is wired up (quest completion, +2 per local model use), it should
+  // call this, which is the single place that moves earned tokens into the
+  // frontier balance. Deliberately unimplemented rather than faked.
+  async creditTokens(amount, reason) {
+    console.warn(`[frontier] earning not wired yet: would credit ${amount} for "${reason}"`);
+    // TODO: POST ${FRONTIER_ENDPOINT}/credit once the relay exposes an
+    // authenticated award endpoint. Do not credit from the client.
+  }
+
   static MODELS = [
     { id: 'qwen2.5:0.5b', name: 'Qwen 2.5 · 0.5B', desc: 'Chat model — ~400 MB, ~50 tok/s on a CPU-only 8 GB laptop.' },
     { id: 'qwen2.5:1.5b', name: 'Qwen 2.5 · 1.5B', desc: 'Sub-agent model — more reliable tool-calling for agent loops.' },
@@ -493,11 +751,27 @@ class Component extends DCLogic {
     quizOpen: false, quizPicks: [null, null, null], quizFail: false, quizPassed: false,
     subAgentOn: false, thinking: 2,
     toast: null, guideStep: null,
+
+    // ── Coding Spaces ──
+    csUnlocked: false,      // stage-5 quest unlocks this
+    csIntroSeen: false,     // the one-time introduction
+    csSessions: [],         // frontier conversations, kept apart from local ones
+    csActive: 0,
+    csModel: 'claude-opus-5',
+    csEffort: 'medium',
+    csInput: '',
+    csBalance: 0,           // authoritative value comes from the relay's ledger
+    csPricing: null,        // GET /pricing — the cost table behind the dial
+    csEstimate: null,       // GET /estimate for the current draft
+    csEstimating: false,
+    csBump: 0,              // increments to retrigger the price bump animation
+    csRelayDown: false,
   };
 
   pillRef = React.createRef(); termRef = React.createRef(); msgsRef = React.createRef(); xtermRef = React.createRef();
   fileRef = React.createRef(); readmeRef = React.createRef();
   guideRef = React.createRef(); gsvgRef = React.createRef(); glineRef = React.createRef(); glabelRef = React.createRef();
+  csScrollRef = React.createRef(); csInputRef = React.createRef();
 
   componentDidMount() {
     if (this.props.startScreen === 'os') {
@@ -507,6 +781,7 @@ class Component extends DCLogic {
     this._guideLoop();
     this._pollOllama();
     this._pollInt = setInterval(() => this._pollOllama(), 3000);
+    this._csInit();
   }
   componentWillUnmount() { cancelAnimationFrame(this._graf); clearInterval(this._pollInt); clearInterval(this._dlInt); if (this._ws) try { this._ws.close(); } catch (e) {} }
 
@@ -790,6 +1065,103 @@ class Component extends DCLogic {
   openQuiz = () => this.setState({ quizOpen: true, quizFail: false, panel: this.state.panel });
   closeQuiz = () => this.setState({ quizOpen: false, quizFail: false });
 
+  // ───── Coding Spaces: talking to the relay ─────
+  //
+  // Everything here goes through the local bridge, which forwards to the relay.
+  // If the relay is unreachable the local tier is untouched — that separation is
+  // the point, so failures here must never break anything above.
+  async _csFetch(path, options) {
+    const res = await fetch(Component.FRONTIER_ENDPOINT + path, options);
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+      const err = new Error((body && body.error && body.error.message) || `relay ${res.status}`);
+      err.code = body && body.error && body.error.code;
+      err.status = res.status;
+      err.body = body;
+      throw err;
+    }
+    return body;
+  }
+
+  async _csInit() {
+    // The cost table behind the dial: fetched once, doesn't depend on the student.
+    try {
+      const pricing = await this._csFetch('/pricing');
+      this.setState({ csPricing: pricing, csRelayDown: false });
+    } catch (e) {
+      this.setState({ csRelayDown: true });
+    }
+    await this._csLoadBalance();
+    // Price something immediately. An empty price on arrival makes the control
+    // look broken, and the whole point of the readout is that it's there before
+    // you commit to anything.
+    this._csRefreshEstimate();
+  }
+
+  async _csLoadBalance() {
+    try {
+      const b = await this._csFetch('/balance/' + encodeURIComponent(Component.studentId()));
+      this.setState({ csBalance: b.tokens, csRelayDown: false });
+    } catch (e) {
+      this.setState({ csRelayDown: true });
+    }
+  }
+
+  _csSession() {
+    const s = this.state;
+    return s.csSessions[s.csActive] || null;
+  }
+
+  // The conversation as the API wants it: the whole history plus the draft.
+  // History is re-sent every turn — the model has no memory otherwise — which is
+  // also why turn 2 onward is cheaper, since the relay caches what it has seen.
+  _csMessages(draft) {
+    const sess = this._csSession();
+    const history = sess ? sess.messages.filter((m) => m.text) .map((m) => ({ role: m.user ? 'user' : 'assistant', content: m.text })) : [];
+    return history.concat([{ role: 'user', content: draft }]);
+  }
+
+  // Pricing a draft is free, so it can run on every keystroke and every change
+  // of model or effort. That live movement is the lesson — don't optimise it
+  // away. Debounced only enough to avoid a request per character.
+  _csRefreshEstimate() {
+    clearTimeout(this._csEstT);
+    this._csEstT = setTimeout(async () => {
+      const s = this.state;
+      // With an empty box there's nothing to measure, so price a representative
+      // short question instead: the ceiling is dominated by output length, not
+      // by the prompt, so the figure stays honest.
+      const draft = s.csInput.trim() || 'Explain how this works and why.';
+      try {
+        const est = await this._csFetch('/estimate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: Component.studentId(),
+            model: s.csModel,
+            effort: s.csEffort,
+            messages: this._csMessages(draft),
+          }),
+        });
+        this.setState({ csEstimate: est, csEstimating: false, csRelayDown: false, csBump: this.state.csBump + 1 });
+      } catch (e) {
+        this.setState({ csEstimating: false, csRelayDown: e.status === undefined || e.code === 'relay_unreachable' });
+      }
+    }, 300);
+    this.setState({ csEstimating: true });
+  }
+
+  _csSetModel(id) {
+    if (id === this.state.csModel) return;
+    this.setState({ csModel: id });
+    this._csRefreshEstimate();
+  }
+  _csSetEffort(effort) {
+    if (effort === this.state.csEffort) return;
+    this.setState({ csEffort: effort });
+    this._csRefreshEstimate();
+  }
+
   // ═════ render values ═════
   renderVals() {
     const s = this.state;
@@ -798,6 +1170,29 @@ class Component extends DCLogic {
     const marketUnlocked = s.stage >= 1;
     const sess = s.sessions[s.activeSession];
     const questGate = s.stage === 1 && !s.owned.swarmkit; // marketplace locked-down guided phase
+
+    // ── Coding Spaces locals ──
+    // Unlocks after the sub-agent quest (stage 4) — it's the next tier up from
+    // running agents locally. `?spaces=1` forces it open for development.
+    const csUnlocked = s.csUnlocked || s.stage >= 4
+      || (typeof location !== 'undefined' && location.search.indexOf('spaces=1') !== -1);
+    const csSess = s.csSessions[s.csActive] || null;
+    const csEst = s.csEstimate;
+    const csModelIds = s.csPricing ? Object.keys(s.csPricing.models) : ['claude-opus-5', 'claude-fable-5'];
+    const csEfforts = s.csPricing ? s.csPricing.efforts : ['low', 'medium', 'high', 'xhigh', 'max'];
+    // Typical costs for the selected model, used to size the dial's bars.
+    const csTypical = (s.csPricing && s.csPricing.models[s.csModel] && s.csPricing.models[s.csModel].typicalTokens) || {};
+    const csMaxTypical = Math.max(0, ...Object.values(csTypical).filter((v) => typeof v === 'number'));
+    // Only warn when a message could genuinely take a big bite. At a lower
+    // threshold this fired on ordinary messages and became wallpaper.
+    const csWarn = (() => {
+      if (!csEst || s.csRelayDown) return '';
+      if (!csEst.affordable) return `Not enough for this one — your local model is free below.`;
+      if (csEst.maxTokenCost && s.csBalance && csEst.maxTokenCost / s.csBalance >= 0.5) {
+        return `Could use up to ${csEst.maxTokenCost} of your ${s.csBalance} — usually much less.`;
+      }
+      return '';
+    })();
 
     // quests
     const mkQuest = (idx, title, desc, reward) => {
@@ -993,6 +1388,67 @@ class Component extends DCLogic {
       // quests
       questList: [q1, q2, q3, q4, q5],
       openQuiz: this.openQuiz,
+
+      // ── Coding Spaces ──
+      panelSpaces: s.panel === 'spaces',
+      csUnlocked,
+      csLocked: !csUnlocked,
+      navSpaces: () => { this.setState({ panel: 'spaces' }); this._csLoadBalance(); this._csRefreshEstimate(); },
+      spacesNavStyle: navBase + (s.panel === 'spaces' ? 'background:#E7E2D6;font-weight:600' : (csUnlocked ? 'color:#6E6A60' : 'color:#B5AF9F')),
+      spacesNavHover: 'background:#ECE8DE',
+      csLockedHint: 'Finish the sub-agent quest first. Coding Spaces is the last unlock — it lets you spend the tokens you’ve earned on models far larger than the one running on your laptop.',
+
+      csSessionList: s.csSessions.map((ss, i) => ({
+        title: ss.title,
+        select: () => this.setState({ csActive: i, panel: 'spaces' }),
+        style: `display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${i === s.csActive && s.panel === 'spaces' ? 'background:#E7E2D6;font-weight:600' : 'color:#6E6A60'}`,
+      })),
+      csNoSessions: s.csSessions.length === 0,
+      csEmpty: !csSess || csSess.messages.length === 0,
+
+      csSuggestions: [
+        { text: 'Debug this function — it returns the wrong answer on some inputs.', pick: () => { this.setState({ csInput: 'Debug this function — it returns the wrong answer on some inputs:\n\n' }); this._csRefreshEstimate(); } },
+        { text: 'Plan how I’d build a small app, step by step.', pick: () => { this.setState({ csInput: 'Plan how I’d build a small app, step by step. ' }); this._csRefreshEstimate(); } },
+      ],
+
+      csInput: s.csInput,
+      csInputRef: this.csInputRef, csScrollRef: this.csScrollRef,
+      csOnInput: (e) => { this.setState({ csInput: e.target.value }); this._csRefreshEstimate(); },
+      csOnKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } },
+
+      csModelOptions: csModelIds.map((id) => ({
+        label: (s.csPricing && s.csPricing.models[id] ? s.csPricing.models[id].label : id).replace('Claude ', ''),
+        cls: s.csModel === id ? 'on' : '',
+        pick: () => this._csSetModel(id),
+      })),
+
+      // Bar height is that stop's typical cost, normalised to the most
+      // expensive stop for this model. Fable 5's flat-flat-flat-cliff curve
+      // then shows up as three short bars and one tall one, which is the
+      // honest shape and impossible to convey with a plain slider.
+      csEffortStops: csEfforts.map((effort) => {
+        const tokens = csTypical[effort];
+        const h = tokens && csMaxTypical ? Math.max(5, Math.round((tokens / csMaxTypical) * 30)) : 8;
+        return {
+          short: { low: 'Low', medium: 'Med', high: 'High', xhigh: 'X-hi', max: 'Max' }[effort],
+          cls: 'stop' + (s.csEffort === effort ? ' on' : ''),
+          lblCls: s.csEffort === effort ? 'on' : '',
+          h: h + 'px',
+          title: tokens ? `${effort} — usually about ${tokens} tokens` : `${effort} — not yet measured`,
+          pick: () => this._csSetEffort(effort),
+        };
+      }),
+
+      csPriceUp: s.csRelayDown ? 'frontier offline' : (csEst && csEst.maxTokenCost != null ? `up to ${csEst.maxTokenCost} tokens` : (s.csEstimating ? 'pricing…' : '—')),
+      csPriceCls: 'up' + (s.csBump % 2 ? ' bump' : ''),
+      // "up to" is load-bearing: the ceiling overstates by roughly 4x, so
+      // presenting it as the price would be a number students learn to distrust.
+      csPriceSub: s.csRelayDown
+        ? 'your local model still works'
+        : (csEst && csEst.typicalTokenCost != null ? `usually ~${csEst.typicalTokenCost} · unused comes back` : 'unused comes back'),
+      csPriceWarn: csWarn,
+      csSendDisabled: !s.csInput.trim() || s.csRelayDown,
+      csSend: () => this.showToast('Sending is wired up in the next step'),
 
       // marketplace
       search: s.search,
