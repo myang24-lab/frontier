@@ -891,7 +891,12 @@ class Component extends DCLogic {
     this._csRestore();
     this._csInit();
   }
-  componentWillUnmount() { cancelAnimationFrame(this._graf); clearInterval(this._pollInt); clearInterval(this._dlInt); if (this._ws) try { this._ws.close(); } catch (e) {} }
+  componentWillUnmount() {
+    cancelAnimationFrame(this._graf); clearInterval(this._pollInt); clearInterval(this._dlInt);
+    clearInterval(this._csTick); clearTimeout(this._csEstT);
+    if (this._csAbort) try { this._csAbort.abort(); } catch (e) {}
+    if (this._ws) try { this._ws.close(); } catch (e) {}
+  }
 
   // ───── Ollama status: poll installed models, drives setup gating + live badge ─────
   async _pollOllama() {
@@ -1320,6 +1325,9 @@ class Component extends DCLogic {
     sess.messages.push(turn);
 
     this.setState({ csSessions: sessions, csActive: idx, csInput: '', csStreaming: true, csEstimate: null });
+    // Persist before the request, not only after. Otherwise reloading mid-answer
+    // loses the question entirely — while the tokens for it have already gone.
+    this._csPersist();
     this._csScroll();
 
     // Elapsed time is shown live: at 30+ seconds a student needs to see that
@@ -1487,7 +1495,10 @@ class Component extends DCLogic {
   _csFallbackToLocal(text) {
     const sessions = this.state.sessions.concat([{ id: Date.now(), title: text.slice(0, 26), msgs: [] }]);
     this.setState({ sessions, activeSession: sessions.length - 1, panel: 'chat', input: text });
-    this.showToast('Sent to your local model — free, and running on this machine');
+    // It is *loaded*, not sent — the student still presses send. Saying "sent"
+    // would be a small lie, and this screen only works if its numbers and its
+    // words can both be trusted.
+    this.showToast('Loaded into your local model — press send. Free, and on this machine.');
   }
 
   _csNewSession() {
@@ -1510,7 +1521,22 @@ class Component extends DCLogic {
   _csRestore() {
     try {
       const raw = localStorage.getItem('cs.sessions');
-      if (raw) this.setState({ csSessions: JSON.parse(raw) });
+      if (!raw) return;
+      const csSessions = JSON.parse(raw);
+      // A reload during a reply leaves that turn frozen mid-stream. Restored as
+      // is, it would pulse a thinking indicator and blink a caret forever
+      // waiting for a stream that died with the old page. Close it honestly.
+      for (const sess of csSessions) {
+        for (const m of sess.messages || []) {
+          if (m.ai && (m.phase === 'thinking' || m.phase === 'answering')) {
+            m.phase = m.answer ? 'done' : 'error';
+            if (!m.answer && !m.card) {
+              m.card = { title: 'This answer was interrupted.', body: 'The page reloaded while it was being written. Anything already generated was charged; the rest was returned.' };
+            }
+          }
+        }
+      }
+      this.setState({ csSessions, csActive: Math.max(0, csSessions.length - 1) });
     } catch (e) {}
   }
 
@@ -1692,7 +1718,11 @@ class Component extends DCLogic {
         select: () => { this.setState({ activeSession: i }); this._backToChat(); },
         style: `padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${i === s.activeSession && s.panel === 'chat' ? 'background:#E7E2D6;font-weight:600' : 'color:#6E6A60'}`,
       })),
+      // "New session" belongs to whichever tier you're looking at. In Coding
+      // Spaces it must start a frontier conversation — silently creating a
+      // local one and jumping panels is a jarring way to lose your place.
       addSession: () => {
+        if (s.panel === 'spaces') return this._csNewSession();
         const sessions = s.sessions.concat([{ id: Date.now(), title: 'New session', msgs: [] }]);
         this.setState({ sessions, activeSession: sessions.length - 1 });
         this._backToChat();
@@ -1756,7 +1786,9 @@ class Component extends DCLogic {
 
       csSessionList: s.csSessions.map((ss, i) => ({
         title: ss.title,
-        select: () => this.setState({ csActive: i, panel: 'spaces' }),
+        // Re-price on switch: the estimate reflects the conversation being
+        // continued, and a different one costs a different amount.
+        select: () => { this.setState({ csActive: i, panel: 'spaces' }); this._csRefreshEstimate(); },
         style: `display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${i === s.csActive && s.panel === 'spaces' ? 'background:#E7E2D6;font-weight:600' : 'color:#6E6A60'}`,
       })),
       csNoSessions: s.csSessions.length === 0,
