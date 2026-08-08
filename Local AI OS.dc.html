@@ -1225,8 +1225,27 @@ class Component extends DCLogic {
   // also why turn 2 onward is cheaper, since the relay caches what it has seen.
   _csMessages(draft) {
     const sess = this._csSession();
-    const history = sess ? sess.messages.filter((m) => m.text) .map((m) => ({ role: m.user ? 'user' : 'assistant', content: m.text })) : [];
-    return history.concat([{ role: 'user', content: draft }]);
+    const raw = [];
+    for (const m of (sess ? sess.messages : [])) {
+      // User turns keep their text in `text`; assistant turns accumulate into
+      // `answer`. Reading the wrong field silently drops every assistant turn,
+      // which leaves two user messages in a row and the API rejects the whole
+      // conversation.
+      const content = m.user ? m.text : m.answer;
+      if (content && content.trim()) raw.push({ role: m.user ? 'user' : 'assistant', content });
+    }
+    raw.push({ role: 'user', content: draft });
+
+    // A turn that failed, was stopped before writing anything, or was declined
+    // leaves a user message with no reply. Roles must strictly alternate and
+    // start with `user`, so keep only the messages that preserve that.
+    const out = [];
+    for (const m of raw) {
+      const expected = out.length % 2 === 0 ? 'user' : 'assistant';
+      if (m.role === expected) out.push(m);
+      else if (m.role === 'user') out[out.length - 1] = m; // newer question replaces the unanswered one
+    }
+    return out;
   }
 
   // Pricing a draft is free, so it can run on every keystroke and every change
@@ -1336,7 +1355,14 @@ class Component extends DCLogic {
         };
         return;
       }
-      if (!res.ok || !res.body) throw new Error('relay ' + res.status);
+      // A rejected request is not an unreachable one. Read what the relay
+      // actually said instead of blaming the network for a 400.
+      if (!res.ok || !res.body) {
+        const body = await res.json().catch(() => null);
+        const err = new Error((body && body.error && body.error.message) || `The relay returned ${res.status}.`);
+        err.relayCode = (body && body.error && body.error.code) || `http_${res.status}`;
+        throw err;
+      }
 
       await this._csReadStream(res.body, turn);
     } catch (err) {
@@ -1348,11 +1374,35 @@ class Component extends DCLogic {
           turn.card = { title: 'Stopped.', body: 'You were charged for what had already been generated. The rest went back.' };
         }
       } else {
+        // Say what actually broke. Reporting every failure as "can't reach"
+        // sends you looking at the network when the request was simply
+        // rejected — which is exactly the wrong place to look.
         turn.phase = 'error';
-        turn.card = {
-          title: "Can't reach the frontier models.",
-          body: 'Your local model is still working normally — nothing on your machine is affected. Try again in a moment.',
-        };
+        console.error('[frontier]', err.relayCode || 'network', err.message);
+        const code = err.relayCode;
+        if (!code || code === 'relay_unreachable' || code === 'api_unreachable') {
+          turn.card = {
+            title: "Can't reach the frontier models.",
+            body: 'Your local model is still working normally — nothing on your machine is affected. Try again in a moment.',
+          };
+        } else if (code === 'rate_limited') {
+          turn.card = {
+            title: 'Too many requests right now.',
+            body: 'Wait about a minute and try again. Nothing was charged.',
+          };
+        } else if (code === 'conversation_too_long') {
+          turn.card = {
+            title: 'This conversation has got too long.',
+            body: 'Start a new one — it will also be cheaper, since the whole history is re-sent every turn.',
+            actionLabel: 'Start a new conversation',
+            action: () => this._csNewSession(),
+          };
+        } else {
+          turn.card = {
+            title: 'That message was rejected.',
+            body: err.message + " You weren't charged. Try rephrasing, or use your local model.",
+          };
+        }
       }
     } finally {
       clearInterval(this._csTick);
@@ -1438,6 +1488,13 @@ class Component extends DCLogic {
     const sessions = this.state.sessions.concat([{ id: Date.now(), title: text.slice(0, 26), msgs: [] }]);
     this.setState({ sessions, activeSession: sessions.length - 1, panel: 'chat', input: text });
     this.showToast('Sent to your local model — free, and running on this machine');
+  }
+
+  _csNewSession() {
+    const csSessions = this.state.csSessions.concat([{ id: Date.now(), title: 'New space', messages: [] }]);
+    this.setState({ csSessions, csActive: csSessions.length - 1, panel: 'spaces' });
+    this._csPersist();
+    this._csRefreshEstimate();
   }
 
   _csScroll() {
