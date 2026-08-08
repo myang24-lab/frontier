@@ -71,7 +71,11 @@ input:focus,textarea:focus,button:focus{outline:none}
   --serif:'Newsreader',Georgia,serif;
   --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:ui-monospace,Menlo,monospace;
-  flex:1;display:flex;flex-direction:column;min-width:0;position:relative;
+  /* min-height:0 is load-bearing. A flex child defaults to min-height:auto,
+     which refuses to shrink below its content — so without this the transcript
+     grows past the viewport and .scroll never scrolls. The local chat panel
+     sets the same thing for the same reason. */
+  flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;position:relative;
 }
 .cs *{box-sizing:border-box}
 
@@ -87,7 +91,7 @@ input:focus,textarea:focus,button:focus{outline:none}
 .cs .chip-frontier .d{width:6px;height:6px;background:var(--on-dark);transform:rotate(45deg);border-radius:1px}
 
 /* transcript */
-.cs .scroll{flex:1;overflow-y:auto;padding:24px 24px 12px}
+.cs .scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:24px 24px 12px}
 .cs .col{max-width:680px;margin:0 auto}
 .cs .hero{padding-top:14vh;text-align:center;animation:fadeUp .4s ease both}
 .cs .hero h2{font-family:var(--serif);font-weight:500;font-size:28px;margin:0 0 10px}
@@ -547,6 +551,76 @@ input:focus,textarea:focus,button:focus{outline:none}
                       </div>
                     </div>
                   </sc-if>
+
+                  <sc-for list="{{ csTurns }}" as="m" hint-placeholder-count="0">
+                    <sc-if value="{{ m.user }}" hint-placeholder-val="{{ false }}">
+                      <div class="t-user"><div class="bub">{{ m.text }}</div></div>
+                    </sc-if>
+                    <sc-if value="{{ m.ai }}" hint-placeholder-val="{{ false }}">
+                      <div class="t-ai">
+                        <div class="t-meta">
+                          <span class="badge-f"><span class="d"></span>{{ m.badge }}</span>
+                          <span class="elapsed">{{ m.elapsed }}</span>
+                        </div>
+
+                        <!-- Reasoning is the main content while it's happening,
+                             then collapses to a toggle once the answer starts. -->
+                        <sc-if value="{{ m.hasReasoning }}" hint-placeholder-val="{{ false }}">
+                          <div class="{{ m.reasonCls }}">
+                            <div class="rlabel">
+                              <sc-if value="{{ m.thinking }}" hint-placeholder-val="{{ false }}"><span class="tick"></span></sc-if>
+                              <span>{{ m.reasonLabel }}</span>
+                              <sc-if value="{{ m.reasonDone }}" hint-placeholder-val="{{ false }}">
+                                <button class="rtoggle" onClick="{{ m.toggleReason }}">{{ m.reasonToggleLabel }}</button>
+                              </sc-if>
+                            </div>
+                            <div class="rbody">{{ m.reasoning }}</div>
+                          </div>
+                        </sc-if>
+
+                        <sc-if value="{{ m.showHold }}" hint-placeholder-val="{{ false }}">
+                          <div class="hold-note">Holding <b>{{ m.held }}</b> tokens — you're charged only for what it writes.</div>
+                        </sc-if>
+
+                        <sc-if value="{{ m.hasAnswer }}" hint-placeholder-val="{{ false }}">
+                          <div class="ans" style="white-space:pre-wrap">{{ m.answer }}<sc-if value="{{ m.streaming }}" hint-placeholder-val="{{ false }}"><span class="caret"></span></sc-if></div>
+                        </sc-if>
+
+                        <sc-if value="{{ m.hasReceipt }}" hint-placeholder-val="{{ false }}">
+                          <div class="receipt">
+                            <div class="row1">
+                              <span>charged <b>{{ m.rCharged }}</b></span>
+                              <span>returned {{ m.rRefunded }}</span>
+                              <span>balance {{ m.rBalance }}</span>
+                              <span class="usd">{{ m.rUsd }}</span>
+                            </div>
+                            <sc-if value="{{ m.hasSplit }}" hint-placeholder-val="{{ false }}">
+                              <div class="split">
+                                <div class="splitbar">
+                                  <div class="think" style="width:{{ m.splitThink }}"></div>
+                                  <div class="ans-b" style="width:{{ m.splitAns }}"></div>
+                                </div>
+                                <span>{{ m.splitLabel }}</span>
+                              </div>
+                            </sc-if>
+                            <sc-if value="{{ m.cacheNote }}" hint-placeholder-val="{{ false }}">
+                              <div class="cache-note">{{ m.cacheNote }}</div>
+                            </sc-if>
+                          </div>
+                        </sc-if>
+
+                        <sc-if value="{{ m.hasCard }}" hint-placeholder-val="{{ false }}">
+                          <div class="scard">
+                            <h4>{{ m.cardTitle }}</h4>
+                            <p>{{ m.cardBody }}</p>
+                            <sc-if value="{{ m.cardAction }}" hint-placeholder-val="{{ false }}">
+                              <div class="acts"><button class="btn-ghost" onClick="{{ m.cardAction }}">{{ m.cardActionLabel }}</button></div>
+                            </sc-if>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </sc-for>
                 </div>
               </div>
 
@@ -582,10 +656,15 @@ input:focus,textarea:focus,button:focus{outline:none}
                         <span class="warn">{{ csPriceWarn }}</span>
                       </sc-if>
                     </div>
-                    <button onClick="{{ csSend }}" class="send" disabled="{{ csSendDisabled }}">↑</button>
+                    <sc-if value="{{ csIdle }}" hint-placeholder-val="{{ true }}">
+                      <button onClick="{{ csSend }}" class="send" disabled="{{ csSendDisabled }}">↑</button>
+                    </sc-if>
+                    <sc-if value="{{ csStreaming }}" hint-placeholder-val="{{ false }}">
+                      <button onClick="{{ csStop }}" class="stopbtn"><span class="sq"></span>Stop</button>
+                    </sc-if>
                   </div>
                 </div>
-                <div class="comp-foot">Priced before you send, free — only what the model actually writes is charged.</div>
+                <div class="comp-foot">{{ csFootNote }}</div>
               </div>
             </sc-if>
           </div>
@@ -766,6 +845,7 @@ class Component extends DCLogic {
     csEstimating: false,
     csBump: 0,              // increments to retrigger the price bump animation
     csRelayDown: false,
+    csStreaming: false,
   };
 
   pillRef = React.createRef(); termRef = React.createRef(); msgsRef = React.createRef(); xtermRef = React.createRef();
@@ -808,6 +888,7 @@ class Component extends DCLogic {
     }
     this._pollOllama();
     this._pollInt = setInterval(() => this._pollOllama(), 3000);
+    this._csRestore();
     this._csInit();
   }
   componentWillUnmount() { cancelAnimationFrame(this._graf); clearInterval(this._pollInt); clearInterval(this._dlInt); if (this._ws) try { this._ws.close(); } catch (e) {} }
@@ -1189,6 +1270,193 @@ class Component extends DCLogic {
     this._csRefreshEstimate();
   }
 
+  // ───── Coding Spaces: sending ─────
+  //
+  // The turn has three visible phases and the design turns on the first one:
+  // reasoning streams for 25-37s at high effort and is the *only* content on
+  // screen during it, then yields to the answer, then the receipt lands.
+  csSend = async () => {
+    const s = this.state;
+    const text = s.csInput.trim();
+    if (!text || s.csStreaming) return;
+
+    // Build the history the API sees *before* appending this turn's placeholder.
+    const history = this._csMessages(text);
+
+    let sessions = s.csSessions.slice();
+    let idx = s.csActive;
+    if (!sessions[idx]) {
+      sessions = sessions.concat([{ id: Date.now(), title: 'New space', messages: [] }]);
+      idx = sessions.length - 1;
+    }
+    const sess = sessions[idx];
+    if (!sess.messages.length) sess.title = text.slice(0, 26) + (text.length > 26 ? '…' : '');
+
+    sess.messages.push({ user: true, text });
+    const turn = {
+      ai: true, model: s.csModel, effort: s.csEffort,
+      reasoning: '', answer: '', phase: 'thinking',
+      startedAt: Date.now(), elapsedMs: 0, reasonOpen: false,
+    };
+    sess.messages.push(turn);
+
+    this.setState({ csSessions: sessions, csActive: idx, csInput: '', csStreaming: true, csEstimate: null });
+    this._csScroll();
+
+    // Elapsed time is shown live: at 30+ seconds a student needs to see that
+    // something is still happening, not just trust it.
+    clearInterval(this._csTick);
+    this._csTick = setInterval(() => { turn.elapsedMs = Date.now() - turn.startedAt; this.forceUpdate(); }, 200);
+
+    const ctrl = new AbortController();
+    this._csAbort = ctrl;
+
+    try {
+      const res = await fetch(Component.FRONTIER_ENDPOINT + '/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: Component.studentId(),
+          model: s.csModel, effort: s.csEffort, messages: history,
+        }),
+        signal: ctrl.signal,
+      });
+
+      // Out of tokens arrives as a status before the stream opens, precisely so
+      // this branch can offer the local model instead of abandoning a
+      // half-rendered reply.
+      if (res.status === 402) {
+        const body = await res.json();
+        turn.phase = 'broke';
+        turn.card = {
+          title: "You're out of tokens for this one.",
+          body: `This message needs about ${body.neededTokens} and you have ${body.balanceTokens}. Earn more by using your local model and finishing quests — or send it to Qwen 2.5 on your laptop right now, free.`,
+          actionLabel: 'Send to my local model instead',
+          action: () => this._csFallbackToLocal(text),
+        };
+        return;
+      }
+      if (!res.ok || !res.body) throw new Error('relay ' + res.status);
+
+      await this._csReadStream(res.body, turn);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        // Stop already settled server-side; the `cancelled` event may not have
+        // arrived before the socket closed, so state it plainly here.
+        turn.phase = 'stopped';
+        if (!turn.card) {
+          turn.card = { title: 'Stopped.', body: 'You were charged for what had already been generated. The rest went back.' };
+        }
+      } else {
+        turn.phase = 'error';
+        turn.card = {
+          title: "Can't reach the frontier models.",
+          body: 'Your local model is still working normally — nothing on your machine is affected. Try again in a moment.',
+        };
+      }
+    } finally {
+      clearInterval(this._csTick);
+      turn.elapsedMs = Date.now() - turn.startedAt;
+      if (turn.phase === 'thinking' || turn.phase === 'answering') turn.phase = 'done';
+      this._csAbort = null;
+      this.setState({ csStreaming: false });
+      this._csPersist();
+      this._csLoadBalance();
+      this._csRefreshEstimate();
+    }
+  };
+
+  csStop = () => {
+    if (this._csAbort) this._csAbort.abort();
+  };
+
+  // Server-Sent Events over fetch. One event per blank-line-separated block.
+  async _csReadStream(body, turn) {
+    const reader = body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const blocks = buf.split('\n\n');
+      buf = blocks.pop();
+      for (const block of blocks) {
+        const evt = /^event: (\w+)$/m.exec(block);
+        const data = /^data: (.*)$/m.exec(block);
+        if (!evt || !data) continue;
+        let payload;
+        try { payload = JSON.parse(data[1]); } catch (e) { continue; }
+        this._csHandleEvent(evt[1], payload, turn);
+      }
+    }
+  }
+
+  _csHandleEvent(type, d, turn) {
+    if (type === 'start') {
+      turn.held = d.heldTokens;
+      turn.warnings = d.warnings || [];
+      turn.cached = d.cached;
+    } else if (type === 'thinking') {
+      turn.reasoning += d.text;
+    } else if (type === 'text') {
+      // First visible word — reasoning steps back and the answer takes over.
+      if (turn.phase === 'thinking') turn.phase = 'answering';
+      turn.answer += d.text;
+    } else if (type === 'done') {
+      turn.phase = d.refused ? 'refused' : 'done';
+      turn.receipt = d;
+      if (d.refused) {
+        turn.card = {
+          title: 'This one came back declined.',
+          body: "The model's safety checks stopped this request. You weren't charged. Rephrasing usually helps — or try your local model, which has different limits.",
+        };
+      } else if (d.truncated) {
+        turn.card = {
+          title: 'This answer hit the length limit.',
+          body: "You paid for what's here. Ask a narrower question, or ask it to continue.",
+        };
+      }
+    } else if (type === 'cancelled') {
+      turn.phase = 'stopped';
+      turn.receipt = d;
+      turn.card = {
+        title: 'Stopped.',
+        body: `You were charged ${d.charged} token${d.charged === 1 ? '' : 's'} for what had already been generated. The other ${d.refunded} went back.`,
+      };
+    } else if (type === 'error') {
+      turn.phase = 'error';
+      turn.card = { title: 'Something went wrong.', body: d.message || 'The message did not complete.' };
+    }
+    this.forceUpdate();
+    this._csScroll();
+  }
+
+  // Out of tokens is never a dead end: the same question goes to the local
+  // model, clearly labelled so nobody mistakes which tier answered.
+  _csFallbackToLocal(text) {
+    const sessions = this.state.sessions.concat([{ id: Date.now(), title: text.slice(0, 26), msgs: [] }]);
+    this.setState({ sessions, activeSession: sessions.length - 1, panel: 'chat', input: text });
+    this.showToast('Sent to your local model — free, and running on this machine');
+  }
+
+  _csScroll() {
+    const el = this.csScrollRef.current;
+    if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }
+
+  // Conversations live in the browser — the relay stores nothing a student
+  // says. That means a reload would lose work they paid for, so persist here.
+  _csPersist() {
+    try { localStorage.setItem('cs.sessions', JSON.stringify(this.state.csSessions)); } catch (e) {}
+  }
+  _csRestore() {
+    try {
+      const raw = localStorage.getItem('cs.sessions');
+      if (raw) this.setState({ csSessions: JSON.parse(raw) });
+    } catch (e) {}
+  }
+
   // ═════ render values ═════
   renderVals() {
     const s = this.state;
@@ -1445,7 +1713,7 @@ class Component extends DCLogic {
       csInput: s.csInput,
       csInputRef: this.csInputRef, csScrollRef: this.csScrollRef,
       csOnInput: (e) => { this.setState({ csInput: e.target.value }); this._csRefreshEstimate(); },
-      csOnKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); } },
+      csOnKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.csSend(); } },
 
       csModelOptions: csModelIds.map((id) => ({
         label: (s.csPricing && s.csPricing.models[id] ? s.csPricing.models[id].label : id).replace('Claude ', ''),
@@ -1478,8 +1746,67 @@ class Component extends DCLogic {
         ? 'your local model still works'
         : (csEst && csEst.typicalTokenCost != null ? `usually ~${csEst.typicalTokenCost} · unused comes back` : 'unused comes back'),
       csPriceWarn: csWarn,
-      csSendDisabled: !s.csInput.trim() || s.csRelayDown,
-      csSend: () => this.showToast('Sending is wired up in the next step'),
+      csSendDisabled: !s.csInput.trim() || s.csRelayDown || s.csStreaming,
+      csSend: this.csSend,
+      csStop: this.csStop,
+      csIdle: !s.csStreaming,
+      csStreaming: s.csStreaming,
+      csFootNote: s.csStreaming
+        ? 'Stopping charges you for what has been written so far.'
+        : 'Priced before you send, free — only what the model actually writes is charged.',
+
+      csTurns: (csSess ? csSess.messages : []).map((m, i) => {
+        if (m.user) return { user: true, ai: false, text: m.text };
+        const spec = s.csPricing && s.csPricing.models[m.model];
+        const r = m.receipt;
+        const split = r && r.reasoning;
+        const thinkPct = split && split.thinkingShare != null ? Math.round(split.thinkingShare * 100) : null;
+        return {
+          user: false, ai: true,
+          badge: `${(spec ? spec.label : m.model).replace('Claude ', '')} · ${m.effort}`,
+          elapsed: (m.elapsedMs / 1000).toFixed(m.elapsedMs < 60000 ? 1 : 0) + 's',
+
+          thinking: m.phase === 'thinking',
+          streaming: m.phase === 'thinking' || m.phase === 'answering',
+          hasReasoning: !!m.reasoning,
+          // While thinking, the reasoning panel is open and dominant. Once the
+          // answer starts it collapses — but stays reachable, because "what did
+          // I actually pay for" is the question this screen exists to answer.
+          reasonCls: 'reason' + (m.phase === 'thinking' ? '' : ' done') + (m.reasonOpen ? ' open' : ''),
+          reasonDone: m.phase !== 'thinking',
+          reasonLabel: m.phase === 'thinking' ? 'THINKING' : 'THOUGHT FOR ' + (m.reasoning.length / 5 | 0) + ' WORDS',
+          reasonToggleLabel: m.reasonOpen ? 'hide' : 'show',
+          toggleReason: () => { m.reasonOpen = !m.reasonOpen; this.forceUpdate(); },
+          reasoning: m.reasoning,
+
+          showHold: m.phase === 'thinking' && !!m.held,
+          held: m.held,
+
+          hasAnswer: !!m.answer,
+          answer: m.answer,
+
+          hasReceipt: !!r && m.phase !== 'broke',
+          rCharged: r ? `${r.charged} token${r.charged === 1 ? '' : 's'}` : '',
+          rRefunded: r ? `${r.refunded}` : '',
+          rBalance: r ? `${r.balance}` : '',
+          rUsd: r && r.cost ? `$${r.cost.totalUSD.toFixed(4)}` : '',
+          hasSplit: !!(split && thinkPct != null),
+          splitThink: thinkPct + '%',
+          splitAns: (100 - thinkPct) + '%',
+          // Labelled "about" on purpose — streamed responses don't return an
+          // exact breakdown, so this is inferred from what came down the wire.
+          splitLabel: thinkPct != null ? `about ${thinkPct}% of that was thinking you never saw` : '',
+          cacheNote: r && r.usage && r.usage.cache_read_input_tokens > 0
+            ? `${r.usage.cache_read_input_tokens.toLocaleString()} tokens of this conversation were re-read from cache at a tenth of the price — which is why turns after the first cost less.`
+            : '',
+
+          hasCard: !!m.card,
+          cardTitle: m.card ? m.card.title : '',
+          cardBody: m.card ? m.card.body : '',
+          cardAction: m.card && m.card.action ? m.card.action : null,
+          cardActionLabel: m.card && m.card.actionLabel ? m.card.actionLabel : '',
+        };
+      }),
 
       // marketplace
       search: s.search,
