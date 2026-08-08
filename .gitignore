@@ -8,6 +8,9 @@ node_modules/
 # Ledger database (step 6) — local state, not source.
 *.sqlite
 *.sqlite-journal
+# WAL mode writes these two alongside the database — they hold committed
+# ledger rows and must not be tracked either.
+*.sqlite-wal
+*.sqlite-shm
 
-.DS_Store
 .DS_Store
