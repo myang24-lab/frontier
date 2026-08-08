@@ -779,6 +779,11 @@ class Component extends DCLogic {
     }
     this._gp = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     this._guideLoop();
+    // Development shortcut: ?spaces=1 opens straight into Coding Spaces,
+    // skipping model selection and setup. Only affects a URL you have to type.
+    if (typeof location !== 'undefined' && location.search.indexOf('spaces=1') !== -1) {
+      this.setState({ screen: 'os', panel: 'spaces', modelId: 'qwen2.5:0.5b', csUnlocked: true });
+    }
     this._pollOllama();
     this._pollInt = setInterval(() => this._pollOllama(), 3000);
     this._csInit();
@@ -1283,7 +1288,11 @@ class Component extends DCLogic {
     return {
       // shell
       isModel: s.screen === 'model', isTerminal: s.screen === 'terminal', isOS: s.screen === 'os',
-      tokensUnlocked: s.tokensUnlocked, tokensLocked: !s.tokensUnlocked, displayTokens: s.displayTokens,
+      // In Coding Spaces the pill shows the frontier balance — that's the
+      // number being spent, and it has to be readable without going looking.
+      tokensUnlocked: s.tokensUnlocked || s.panel === 'spaces',
+      tokensLocked: !s.tokensUnlocked && s.panel !== 'spaces',
+      displayTokens: s.panel === 'spaces' ? s.csBalance : s.displayTokens,
       pillRef: this.pillRef, toast: s.toast,
 
       // screen 1
