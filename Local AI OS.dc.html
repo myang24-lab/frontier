@@ -779,10 +779,32 @@ class Component extends DCLogic {
     }
     this._gp = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     this._guideLoop();
-    // Development shortcut: ?spaces=1 opens straight into Coding Spaces,
-    // skipping model selection and setup. Only affects a URL you have to type.
-    if (typeof location !== 'undefined' && location.search.indexOf('spaces=1') !== -1) {
-      this.setState({ screen: 'os', panel: 'spaces', modelId: 'qwen2.5:0.5b', csUnlocked: true });
+    // Development shortcuts. Both require a URL you have to type deliberately,
+    // so a student never lands in either by accident.
+    //
+    //   ?skip=1    everything unlocked — skips model selection, setup, and the
+    //              whole quest ladder. Lands in chat with every panel open.
+    //   ?spaces=1  the same, but opens directly on Coding Spaces.
+    //
+    // Progression is the product for a student; for anyone building it, having
+    // to replay five quests to reach the screen you're working on is friction
+    // with no upside.
+    const q = typeof location !== 'undefined' ? location.search : '';
+    const skipAll = q.indexOf('skip=1') !== -1;
+    const straightToSpaces = q.indexOf('spaces=1') !== -1;
+    if (skipAll || straightToSpaces) {
+      this.setState({
+        screen: 'os',
+        panel: straightToSpaces ? 'spaces' : 'chat',
+        modelId: 'qwen2.5:0.5b',
+        stage: 4,                 // past every quest
+        quizPassed: true,         // sub-agents available
+        owned: { swarmkit: true },
+        tokensUnlocked: true,
+        tokens: 50, displayTokens: 50,
+        csUnlocked: true,
+        csIntroSeen: true,        // don't replay the introduction each reload
+      });
     }
     this._pollOllama();
     this._pollInt = setInterval(() => this._pollOllama(), 3000);
